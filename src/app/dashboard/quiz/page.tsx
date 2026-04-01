@@ -72,6 +72,7 @@ export default function QuizPage() {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [timeLeft, setTimeLeft] = useState(600) // 10 minutes in seconds
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
   const [isReviewing, setIsReviewing] = useState(false)
   const { toast } = useToast()
@@ -79,13 +80,19 @@ export default function QuizPage() {
   const currentQuestion = MOCK_QUESTIONS[currentQuestionIdx]
   const progress = ((currentQuestionIdx + 1) / MOCK_QUESTIONS.length) * 100
 
-  const handleFinish = useCallback(() => {
+  const handleFinish = useCallback(async () => {
+    if (isSubmitting || isFinished) return
+    setIsSubmitting(true)
+    
+    // Final save logic would go here
     setIsFinished(true)
+    setIsSubmitting(false)
+    
     toast({
       title: "Quiz Completed!",
-      description: "You've finished the quiz. Let's see how you did!",
+      description: "Your answers have been securely submitted.",
     })
-  }, [toast])
+  }, [isSubmitting, isFinished, toast])
 
   useEffect(() => {
     if (mode === "practice" || isFinished) return

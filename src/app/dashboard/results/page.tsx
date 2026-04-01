@@ -14,9 +14,11 @@ import {
   CheckCircle2,
   XCircle,
   GraduationCap,
-  ChevronRight
+  ChevronRight,
+  PartyPopper
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import confetti from 'canvas-confetti'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
@@ -74,6 +76,37 @@ export default function ResultsPage() {
     { name: "Correct", value: MOCK_RESULTS.correctAnswers, color: "#10B981" },
     { name: "Incorrect", value: MOCK_RESULTS.incorrectAnswers, color: "#EF4444" }
   ]
+
+  useEffect(() => {
+    if (MOCK_RESULTS.score >= 90) {
+      const duration = 3 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+      const interval: any = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+      }, 250);
+    }
+  }, [])
+
+  const handleTakeAnother = () => {
+    router.push("/dashboard")
+  }
+
+  const handleRetry = () => {
+    // Navigate back to the quiz with the same subject and mode
+    router.push(`/dashboard/mode-selection?subject=${subject}`)
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
@@ -239,7 +272,7 @@ export default function ResultsPage() {
         {/* Action Buttons */}
         <section className="flex flex-wrap items-center justify-center gap-4 pt-10">
           <Button 
-            onClick={() => router.push("/dashboard")}
+            onClick={handleTakeAnother}
             className="h-14 px-8 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-lg shadow-xl shadow-primary/20 transition-all active:scale-95 group"
           >
             Take Another Test
@@ -261,7 +294,7 @@ export default function ResultsPage() {
           </Button>
           <Button 
             variant="ghost"
-            onClick={() => window.location.reload()}
+            onClick={handleRetry}
             className="h-14 px-8 rounded-2xl text-slate-400 font-black text-lg hover:bg-primary/5 transition-all"
           >
             <RotateCcw className="mr-2 h-5 w-5" />

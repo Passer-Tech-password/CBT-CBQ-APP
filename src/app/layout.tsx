@@ -9,6 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "CBT & CBQ - Computer Based Test & Quiz",
   description: "Advanced Computer-Based Testing and Quiz platform for students and educators.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

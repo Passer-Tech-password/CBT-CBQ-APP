@@ -3,8 +3,9 @@
 import { auth } from "@/lib/firebase"
 import { signOut } from "firebase/auth"
 import { useRouter } from "next/navigation"
-import { GraduationCap, LogOut, User, Bell, Search } from "lucide-react"
+import { GraduationCap, LogOut, User, Bell, Search, Cloud, CloudOff, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useOfflineSync } from "@/hooks/use-offline-sync"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,10 +16,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 export function DashboardNavbar() {
   const router = useRouter()
   const user = auth.currentUser
+  const { isOnline, isSyncing, syncPendingResults } = useOfflineSync()
 
   const handleSignOut = async () => {
     await signOut(auth)
@@ -35,14 +38,30 @@ export function DashboardNavbar() {
             </div>
             <span className="hidden sm:inline-block">CBT & CBQ</span>
           </div>
-          <div className="hidden lg:flex relative max-w-sm w-full">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/50" />
-            <Input 
-              placeholder="Search subjects, tests..." 
-              className="pl-10 w-[300px] h-10 border-white/20 bg-white/10 text-white placeholder:text-white/50 focus:border-white/40 focus:bg-white/20 transition-all rounded-xl"
-            />
+          
+          {/* Offline Status Indicator */}
+          <div className="hidden lg:flex items-center space-x-2 bg-white/10 px-4 py-2 rounded-xl border border-white/10 group cursor-help transition-all hover:bg-white/20">
+            {isOnline ? (
+              <div className="flex items-center space-x-2">
+                <Cloud className="h-4 w-4 text-accent" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Online • Secure</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <CloudOff className="h-4 w-4 text-red-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-red-200">Offline • Local Save</span>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={syncPendingResults}
+                  disabled={isSyncing}
+                  className="h-6 w-6 rounded-full hover:bg-white/10 ml-2"
+                >
+                  <RefreshCw className={cn("h-3 w-3", isSyncing && "animate-spin")} />
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
 
         <div className="flex items-center space-x-4 md:space-x-6">
           <div className="hidden md:flex flex-col items-end text-right">
