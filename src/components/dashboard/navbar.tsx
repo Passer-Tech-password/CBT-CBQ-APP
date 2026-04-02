@@ -3,7 +3,7 @@
 import { auth } from "@/lib/firebase"
 import { signOut } from "firebase/auth"
 import { useRouter } from "next/navigation"
-import { GraduationCap, LogOut, User, Bell, Search, Cloud, CloudOff, RefreshCw } from "lucide-react"
+import { GraduationCap, LogOut, User, Bell, Cloud, CloudOff, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useOfflineSync } from "@/hooks/use-offline-sync"
 import {
@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 export function DashboardNavbar() {
@@ -30,26 +29,26 @@ export function DashboardNavbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-primary text-white shadow-lg">
-      <div className="container flex h-20 items-center justify-between px-4 md:px-8">
+      <div className="container flex h-20 items-center justify-between px-4 md:px-8 mx-auto">
         <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-3 font-black text-2xl tracking-tighter">
+          <div className="flex items-center space-x-3 font-black text-2xl tracking-tighter cursor-pointer" onClick={() => router.push("/dashboard")}>
             <div className="bg-white p-1.5 rounded-xl shadow-inner">
               <GraduationCap className="h-7 w-7 text-primary" />
             </div>
-            <span className="hidden sm:inline-block">CBT & CBQ</span>
+            <span className="hidden sm:inline-block text-white">CBT & CBQ</span>
           </div>
           
           {/* Offline Status Indicator */}
           <div className="hidden lg:flex items-center space-x-2 bg-white/10 px-4 py-2 rounded-xl border border-white/10 group cursor-help transition-all hover:bg-white/20">
             {isOnline ? (
               <div className="flex items-center space-x-2">
-                <Cloud className="h-4 w-4 text-accent" />
+                <Cloud className="h-4 w-4 text-emerald-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Online • Secure</span>
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <CloudOff className="h-4 w-4 text-red-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-red-200">Offline • Local Save</span>
+                <CloudOff className="h-4 w-4 text-rose-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-200">Offline • Local Save</span>
                 <Button 
                   size="icon" 
                   variant="ghost" 
@@ -62,6 +61,7 @@ export function DashboardNavbar() {
               </div>
             )}
           </div>
+        </div>
 
         <div className="flex items-center space-x-4 md:space-x-6">
           <div className="hidden md:flex flex-col items-end text-right">
@@ -71,7 +71,7 @@ export function DashboardNavbar() {
 
           <Button variant="ghost" size="icon" className="relative text-white hover:bg-white/10 h-11 w-11 rounded-xl">
             <Bell className="h-6 w-6" />
-            <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-accent border-2 border-primary"></span>
+            <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-primary"></span>
           </Button>
 
           <DropdownMenu>

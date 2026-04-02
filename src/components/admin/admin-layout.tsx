@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin" },
   { name: "Questions", icon: BookOpen, path: "/admin/questions" },
   { name: "Users", icon: Users, path: "/admin/users" },
+  { name: "Quiz Builder", icon: BookOpen, path: "/admin/builder" },
   { name: "Competitions", icon: Trophy, path: "/admin/competitions" },
   { name: "Analytics", icon: BarChart3, path: "/admin/analytics" },
   { name: "Settings", icon: Settings, path: "/admin/settings" },
