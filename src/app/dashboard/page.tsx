@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { auth, db } from "@/lib/firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
-import { Loader2, Sparkles, Trophy, Calendar, ArrowRight } from "lucide-react"
+import { Loader2, Sparkles, Trophy, Calendar, ArrowRight, User } from "lucide-react"
 import { motion } from "framer-motion"
 
 import { DashboardNavbar } from "@/components/dashboard/navbar"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
@@ -13,13 +13,12 @@ import {
   CheckCircle2, 
   XCircle,
   Trophy,
-  BarChart,
   RefreshCcw,
   BookOpen,
   ShieldCheck
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
@@ -63,7 +62,7 @@ const MOCK_QUESTIONS = [
   }
 ]
 
-export default function QuizPage() {
+function QuizContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const mode = searchParams.get("mode") || "practice"
@@ -415,5 +414,17 @@ export default function QuizPage() {
         <Progress value={progress} className="h-1.5 bg-slate-100" indicatorClassName="bg-primary" />
       </div>
     </div>
+  )
+}
+
+export default function QuizPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <QuizContent />
+    </Suspense>
   )
 }

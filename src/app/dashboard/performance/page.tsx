@@ -13,7 +13,8 @@ import {
   ArrowUpRight, 
   Sparkles,
   ChevronRight,
-  BookOpen
+  BookOpen,
+  CheckCircle2
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -127,7 +128,7 @@ export default function PerformancePage() {
                     stroke="#1E3A8A" 
                     strokeWidth={5} 
                     dot={{ r: 6, fill: '#1E3A8A', strokeWidth: 3, stroke: '#fff' }}
-                    activeDot={{ r: 10, shadow: '0 10px 15px rgba(30,58,138,0.3)' }}
+                    activeDot={{ r: 10 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
