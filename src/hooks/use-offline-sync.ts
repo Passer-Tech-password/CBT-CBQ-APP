@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db, auth } from "@/lib/firebase"
 import { useToast } from "@/components/ui/use-toast"
@@ -10,72 +10,18 @@ export function useOfflineSync() {
   const [isSyncing, setIsSyncing] = useState(false)
   const { toast } = useToast()
 
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true)
-      syncPendingResults()
-    }
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-
-    return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
-    }
-  }, [])
-
-  const saveResult = async (result: any) => {
-    if (typeof window === "undefined") return
-
-    const resultWithMeta = {
-      ...result,
-      userId: auth.currentUser?.uid,
-      timestamp: Date.now(), // Use local timestamp for offline consistency
-    }
-
-    if (navigator.onLine) {
-      try {
-        await addDoc(collection(db, "results"), {
-          ...resultWithMeta,
-          timestamp: serverTimestamp(),
-        })
-        toast({ title: "Result Saved", description: "Successfully synced to cloud." })
-      } catch (error) {
-        console.error("Online save failed, falling back to local:", error)
-        saveToLocal(resultWithMeta)
-      }
-    } else {
-      saveToLocal(resultWithMeta)
-    }
-  }
-
-  const saveToLocal = (result: any) => {
-    try {
-      const pending = JSON.parse(localStorage.getItem("pending_results") || "[]")
-      pending.push({ ...result, id: `local_${Date.now()}` })
-      localStorage.setItem("pending_results", JSON.stringify(pending))
-      toast({ 
-        title: "Offline Mode", 
-        description: "Result saved locally. It will sync once you're online.",
-      })
-    } catch (e) {
-      console.error("Local storage save failed:", e)
-      toast({
-        variant: "destructive",
-        title: "Storage Error",
-        description: "Could not save result locally. Check storage permissions.",
-      })
-    }
-  }
-
-  const syncPendingResults = async () => {
+  const syncPendingResults = useCallback(async () => {
     const pending = JSON.parse(localStorage.getItem("pending_results") || "[]")
     if (pending.length === 0) return
 
     setIsSyncing(true)
+    toast({
+      title: "Syncing Data",
+      description: `Synchronizing ${pending.length} pending result(s) with the cloud...`,
+    })
+
     let successCount = 0
+    const failedResults = []
 
     for (const result of pending) {
       try {
@@ -88,19 +34,122 @@ export function useOfflineSync() {
         })
         successCount++
       } catch (error) {
-        console.error("Sync failed for result:", result.id)
+        console.error("Sync failed for result:", result.id, error)
+        failedResults.push(result)
       }
     }
 
+    localStorage.setItem("pending_results", JSON.stringify(failedResults))
+    setIsSyncing(false)
+
     if (successCount > 0) {
-      const remaining = pending.slice(successCount)
-      localStorage.setItem("pending_results", JSON.stringify(remaining))
       toast({ 
         title: "Sync Complete", 
-        description: `Successfully synced ${successCount} pending result(s).`,
+        description: `Successfully uploaded ${successCount} result(s). Your dashboard is now up to date.`,
       })
     }
-    setIsSyncing(false)
+
+    if (failedResults.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "Partial Sync",
+        description: `${failedResults.length} result(s) could not be synced. We'll try again later.`,
+      })
+    }
+  }, [toast])
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      syncPendingResults()
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+      toast({
+        title: "Offline Mode",
+        description: "You're currently offline. Test results will be saved locally.",
+      })
+    }
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    // Initial sync check
+    if (navigator.onLine) {
+      syncPendingResults()
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [syncPendingResults, toast])
+
+  const saveResult = async (result: any) => {
+    if (typeof window === "undefined") return
+
+    // Prevent duplicate submissions by checking if this test unique ID was already handled
+    const submittedTests = JSON.parse(localStorage.getItem("submitted_tests") || "[]")
+    const testKey = `${result.subject}_${result.mode}_${result.timestamp || Date.now()}`
+    
+    if (submittedTests.includes(testKey)) {
+      toast({
+        variant: "destructive",
+        title: "Duplicate Submission",
+        description: "This test result has already been submitted.",
+      })
+      return
+    }
+
+    const resultWithMeta = {
+      ...result,
+      userId: auth.currentUser?.uid,
+      timestamp: Date.now(),
+    }
+
+    if (navigator.onLine) {
+      try {
+        await addDoc(collection(db, "results"), {
+          ...resultWithMeta,
+          timestamp: serverTimestamp(),
+        })
+        
+        // Mark as submitted
+        submittedTests.push(testKey)
+        localStorage.setItem("submitted_tests", JSON.stringify(submittedTests.slice(-20))) // Keep last 20
+
+        toast({ title: "Result Saved", description: "Successfully synced to cloud." })
+      } catch (error) {
+        console.error("Online save failed, falling back to local:", error)
+        saveToLocal(resultWithMeta, testKey)
+      }
+    } else {
+      saveToLocal(resultWithMeta, testKey)
+    }
+  }
+
+  const saveToLocal = (result: any, testKey: string) => {
+    try {
+      const pending = JSON.parse(localStorage.getItem("pending_results") || "[]")
+      pending.push({ ...result, id: `local_${Date.now()}` })
+      localStorage.setItem("pending_results", JSON.stringify(pending))
+      
+      const submittedTests = JSON.parse(localStorage.getItem("submitted_tests") || "[]")
+      submittedTests.push(testKey)
+      localStorage.setItem("submitted_tests", JSON.stringify(submittedTests.slice(-20)))
+
+      toast({ 
+        title: "Offline Save", 
+        description: "Result stored on device. Syncing will occur automatically when online.",
+      })
+    } catch (e) {
+      console.error("Local storage save failed:", e)
+      toast({
+        variant: "destructive",
+        title: "Storage Error",
+        description: "Could not save result locally. Please check your browser storage settings.",
+      })
+    }
   }
 
   return { isOnline, isSyncing, saveResult, syncPendingResults }

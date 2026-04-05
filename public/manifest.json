@@ -1,10 +1,38 @@
 {
-  "name": "CBT & CBQ",
+  "name": "Nigeria CBT & CBQ Excellence Platform",
   "short_name": "CBT-CBQ",
-  "description": "Advanced Computer-Based Testing and Quiz platform.",
+  "description": "Premium Computer-Based Testing and Competency-Based Quiz platform for Nigerian students.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1E3A8A",
-  "icons": []
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=CBT",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=CBT",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Take a Quiz",
+      "url": "/dashboard/mode-selection",
+      "description": "Start a new practice session"
+    },
+    {
+      "name": "Live CBQ",
+      "url": "/dashboard/cbq-live",
+      "description": "Join real-time competitions"
+    }
+  ]
 }

@@ -19,6 +19,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DashboardNavbar } from "@/components/dashboard/navbar"
+import { PerformanceSkeleton } from "@/components/dashboard/performance-skeleton"
 import { cn } from "@/lib/utils"
 
 // Mock analytics data
@@ -42,6 +43,17 @@ const STRENGTHS = ["Algebra", "Genetics", "Grammar", "Optics"]
 const WEAKNESSES = ["Calculus", "Organic Chemistry", "World History"]
 
 export default function PerformancePage() {
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Simulate loading data
+    const timer = setTimeout(() => setIsLoading(false), 1000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isLoading) {
+    return <PerformanceSkeleton />
+  }
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
       <DashboardNavbar />

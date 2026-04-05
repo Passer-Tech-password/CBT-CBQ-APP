@@ -23,8 +23,11 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { auth } from "@/lib/firebase"
-import { signOut } from "firebase/auth"
+import { auth, db } from "@/lib/firebase"
+import { signOut, onAuthStateChanged } from "firebase/auth"
+import { doc, getDoc } from "firebase/firestore"
+import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
 const NAV_ITEMS = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin" },
@@ -39,13 +42,51 @@ const NAV_ITEMS = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isCheckingRole, setIsCheckingRole] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const pathname = usePathname()
-  const user = auth.currentUser
+  const router = useRouter()
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid))
+          if (userDoc.exists() && userDoc.data().role === "admin") {
+            setIsAdmin(true)
+          } else {
+            router.push("/dashboard")
+          }
+        } catch (error) {
+          console.error("Error checking admin role:", error)
+          router.push("/dashboard")
+        }
+      } else {
+        router.push("/login")
+      }
+      setIsCheckingRole(false)
+    })
+
+    return () => unsubscribe()
+  }, [router])
 
   const handleSignOut = async () => {
     await signOut(auth)
-    window.location.href = "/login"
+    router.push("/login")
   }
+
+  if (isCheckingRole) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-lg font-black text-slate-600">Verifying Admin Access...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAdmin) return null
 
   return (
     <div className="min-h-screen bg-slate-50 flex">

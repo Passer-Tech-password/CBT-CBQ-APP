@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import confetti from "canvas-confetti"
 import { 
   ArrowLeft, 
   ChevronLeft, 
@@ -16,13 +17,15 @@ import {
   Users,
   Zap,
   ShieldCheck,
-  Menu
+  Menu,
+  AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
 // Mock questions
@@ -57,35 +60,162 @@ function LiveCBQContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const subject = searchParams.get("subject") || "Biology"
+  const { toast } = useToast()
   
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [timeLeft, setTimeLeft] = useState(60) // 60 seconds per question in live mode
+  const [endTime, setEndTime] = useState(Date.now() + 60 * 1000)
   const [isFinished, setIsFinished] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [participants, setParticipants] = useState(1240)
+  const [cheatWarnings, setCheatWarnings] = useState(0)
+  const [leaderboard, setLeaderboard] = useState(MOCK_LEADERBOARD)
 
   const currentQuestion = MOCK_QUESTIONS[currentQuestionIdx]
   const progress = ((currentQuestionIdx + 1) / MOCK_QUESTIONS.length) * 100
 
+  // Simulate dynamic leaderboard updates
+  useEffect(() => {
+    if (isFinished) return
+    const interval = setInterval(() => {
+      setLeaderboard(prev => {
+        return prev.map(user => ({
+          ...user,
+          score: user.score + Math.floor(Math.random() * 50)
+        })).sort((a, b) => b.score - a.score)
+          .map((user, idx) => ({ ...user, rank: idx + 1 }))
+      })
+      setParticipants(p => p + Math.floor(Math.random() * 5) - 2)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [isFinished])
+
+  const handleFinish = useCallback(async () => {
+    if (isSubmitting || isFinished) return
+    setIsSubmitting(true)
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    setIsFinished(true)
+    setIsSubmitting(false)
+
+    const score = MOCK_QUESTIONS.reduce((acc, q) => 
+      selectedAnswers[q.id] === q.correctAnswer ? acc + 1 : acc, 0
+    )
+    const percentage = (score / MOCK_QUESTIONS.length) * 100
+
+    if (percentage >= 90) {
+      const duration = 5 * 1000
+      const animationEnd = Date.now() + duration
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 }
+
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min
+
+      const interval: any = setInterval(function() {
+        const timeLeft = animationEnd - Date.now()
+        if (timeLeft <= 0) return clearInterval(interval)
+        const particleCount = 50 * (timeLeft / duration)
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#1E3A8A', '#10B981'] })
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#1E3A8A', '#10B981'] })
+      }, 250)
+    }
+
+    toast({
+      title: "Competition Ended",
+      description: `Your responses have been recorded. You scored ${percentage}%!`,
+    })
+  }, [isSubmitting, isFinished, selectedAnswers, toast])
+
+  // Improved Timer logic
   useEffect(() => {
     if (isFinished) return
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (currentQuestionIdx < MOCK_QUESTIONS.length - 1) {
-            setCurrentQuestionIdx(prevIdx => prevIdx + 1)
-            return 60
-          } else {
-            setIsFinished(true)
-            clearInterval(timer)
-            return 0
-          }
+      const now = Date.now()
+      const remaining = Math.max(0, Math.floor((endTime - now) / 1000))
+      
+      setTimeLeft(remaining)
+      
+      if (remaining <= 0) {
+        if (currentQuestionIdx < MOCK_QUESTIONS.length - 1) {
+          setCurrentQuestionIdx(prevIdx => prevIdx + 1)
+          setEndTime(Date.now() + 60 * 1000)
+          return
+        } else {
+          clearInterval(timer)
+          handleFinish()
         }
-        return prev - 1
-      })
+      }
     }, 1000)
     return () => clearInterval(timer)
-  }, [currentQuestionIdx, isFinished])
+  }, [currentQuestionIdx, isFinished, handleFinish, endTime])
+
+  // Keyboard Navigation
+  useEffect(() => {
+    if (isFinished) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        const idx = parseInt(e.key) - 1
+        if (currentQuestion.options[idx]) {
+          handleAnswerSelect(currentQuestion.options[idx])
+        }
+      }
+      if (e.key === 'Enter') {
+        if (currentQuestionIdx < MOCK_QUESTIONS.length - 1) {
+          setCurrentQuestionIdx(prev => prev + 1)
+          setEndTime(Date.now() + 60 * 1000)
+        } else {
+          handleFinish()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentQuestionIdx, currentQuestion, isFinished])
+
+  // Anti-cheat
+  useEffect(() => {
+    if (isFinished) return
+
+    const handleViolation = () => {
+      setCheatWarnings(prev => {
+        const newCount = prev + 1
+        toast({
+          variant: "destructive",
+          title: "Security Violation",
+          description: "Unauthorized window activity detected. Tab switching is strictly prohibited.",
+        })
+        if (newCount >= 2) { // Stricter in CBQ
+          handleFinish()
+          toast({
+            variant: "destructive",
+            title: "Disqualified",
+            description: "Security violations limit reached.",
+          })
+        }
+        return newCount
+      })
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) handleViolation()
+    }
+
+    const handleBlur = () => {
+      setTimeout(() => {
+        if (!document.hasFocus()) handleViolation()
+      }, 100)
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("blur", handleBlur)
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("blur", handleBlur)
+    }
+  }, [isFinished, handleFinish, toast])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -94,6 +224,7 @@ function LiveCBQContent() {
   }
 
   const handleAnswerSelect = (option: string) => {
+    if (isFinished) return
     setSelectedAnswers({ ...selectedAnswers, [currentQuestion.id]: option })
   }
 
@@ -109,7 +240,7 @@ function LiveCBQContent() {
         </span>
       </div>
       <div className="space-y-3">
-        {MOCK_LEADERBOARD.map((user) => (
+        {leaderboard.map((user) => (
           <div key={user.id} className={cn(
             "flex items-center justify-between p-4 rounded-[1.5rem] transition-all border-2",
             user.rank === 1 ? "bg-amber-50 border-amber-100" : "bg-white border-slate-50 shadow-sm"
@@ -137,15 +268,20 @@ function LiveCBQContent() {
   if (isFinished) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full rounded-[3rem] p-10 text-center space-y-8 shadow-2xl">
-          <Trophy className="h-24 w-24 text-accent mx-auto" />
-          <h1 className="text-3xl font-black text-slate-900">Competition Ended!</h1>
-          <p className="text-slate-500 font-bold">Calculating final rankings and scores...</p>
+        <Card className="max-w-md w-full rounded-[3rem] p-10 text-center space-y-8 shadow-2xl bg-white border-none">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-accent/20 rounded-full blur-3xl animate-pulse" />
+            <Trophy className="h-24 w-24 text-accent mx-auto relative drop-shadow-xl" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-black text-slate-900">Competition Ended!</h1>
+            <p className="text-slate-500 font-bold">Your final ranking is being calculated.</p>
+          </div>
           <Button 
             onClick={() => router.push(`/dashboard/results?subject=${subject}`)}
-            className="w-full h-14 rounded-2xl bg-primary text-white font-black text-lg"
+            className="w-full h-16 rounded-2xl bg-primary text-white font-black text-lg shadow-xl shadow-primary/20 transition-all active:scale-95"
           >
-            View My Result
+            View Full Results
           </Button>
         </Card>
       </div>
@@ -154,7 +290,6 @@ function LiveCBQContent() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col lg:flex-row font-sans">
-      {/* Sidebar Leaderboard (Desktop) */}
       <aside className="hidden lg:block w-[400px] border-r bg-slate-50/50 p-10 overflow-y-auto h-screen sticky top-0">
         <div className="mb-10">
           <div className="flex items-center space-x-2 text-primary font-black uppercase tracking-[0.2em] text-xs mb-2">
@@ -169,7 +304,6 @@ function LiveCBQContent() {
       </aside>
 
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <header className="sticky top-0 z-50 w-full border-b bg-white px-4 md:px-12 h-24 flex items-center justify-between shadow-sm">
           <div className="flex items-center space-x-6">
             <div className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse flex items-center">
@@ -194,7 +328,12 @@ function LiveCBQContent() {
               <Clock className="h-6 w-6 mr-3" />
               {formatTime(timeLeft)}
             </div>
-            {/* Mobile Leaderboard Trigger */}
+            {cheatWarnings > 0 && (
+              <div className="bg-red-100 text-red-600 p-2 rounded-xl flex items-center px-4 font-black text-xs">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Security: {cheatWarnings}/2
+              </div>
+            )}
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="lg:hidden h-12 w-12 rounded-xl border-2">
@@ -211,7 +350,6 @@ function LiveCBQContent() {
           </div>
         </header>
 
-        {/* Question Area */}
         <main className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 bg-slate-50/30">
           <div className="w-full max-w-4xl space-y-12">
             <motion.div
@@ -239,7 +377,7 @@ function LiveCBQContent() {
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleAnswerSelect(option)}
                       className={cn(
-                        "relative p-8 rounded-[2rem] text-left transition-all group border-4 text-xl font-black min-h-[120px] shadow-xl",
+                        "relative p-8 rounded-[2.5rem] text-left transition-all group border-4 text-xl font-black min-h-[120px] shadow-xl",
                         isSelected ? "bg-white border-primary text-primary shadow-primary/10" : "bg-white border-transparent hover:border-slate-200 text-slate-600 shadow-slate-200/50"
                       )}
                     >
@@ -260,24 +398,24 @@ function LiveCBQContent() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="h-24 border-t bg-white px-12 flex items-center justify-between shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
           <div className="flex items-center space-x-4 text-slate-400 font-black uppercase tracking-widest text-xs">
             <ShieldCheck className="h-5 w-5" />
-            <span>Anti-Cheat Enabled</span>
+            <span>Anti-Cheat Active</span>
           </div>
           <Button 
+            disabled={isSubmitting}
             className="h-14 px-12 rounded-2xl bg-primary text-white font-black text-lg shadow-xl shadow-primary/20 transition-all active:scale-95"
             onClick={() => {
               if (currentQuestionIdx < MOCK_QUESTIONS.length - 1) {
                 setCurrentQuestionIdx(prev => prev + 1)
                 setTimeLeft(60)
               } else {
-                setIsFinished(true)
+                handleFinish()
               }
             }}
           >
-            Lock Answer
+            {isSubmitting ? "Locking..." : "Lock Answer"}
             <ChevronRight className="ml-3 h-6 w-6" />
           </Button>
         </footer>

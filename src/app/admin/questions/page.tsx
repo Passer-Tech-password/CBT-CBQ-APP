@@ -57,6 +57,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const questionSchema = z.object({
   question: z.string().min(10, "Question must be at least 10 characters"),
@@ -82,7 +83,13 @@ const MOCK_QUESTIONS = [
 export default function QuestionsManagementPage() {
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isLoading, setIsLoading] = React.useState(true)
   const { toast } = useToast()
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800)
+    return () => clearTimeout(timer)
+  }, [])
 
   const form = useForm<QuestionFormValues>({
     resolver: zodResolver(questionSchema),
@@ -116,6 +123,36 @@ export default function QuestionsManagementPage() {
       description: "The question has been successfully added to the database.",
     })
     form.reset()
+  }
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-64" />
+              <Skeleton className="h-6 w-96" />
+            </div>
+            <Skeleton className="h-14 w-56 rounded-2xl" />
+          </div>
+          <Card className="p-8 rounded-[2rem] border-none shadow-xl space-y-6">
+            <div className="flex justify-between">
+              <Skeleton className="h-12 w-1/3 rounded-xl" />
+              <div className="flex space-x-4">
+                <Skeleton className="h-12 w-32 rounded-xl" />
+                <Skeleton className="h-12 w-32 rounded-xl" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          </Card>
+        </div>
+      </AdminLayout>
+    )
   }
 
   return (
