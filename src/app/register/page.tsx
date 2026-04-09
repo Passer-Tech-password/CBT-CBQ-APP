@@ -84,9 +84,16 @@ export default function RegisterPage() {
         }
       })
 
-      // Set role cookie for middleware
-      document.cookie = `user-role=student; path=/; max-age=3600; SameSite=Lax`
-      document.cookie = `auth-token=${user.uid}; path=/; max-age=3600; SameSite=Lax`
+      const idToken = await user.getIdToken()
+
+      // Securely set session cookie via API
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      })
+
+      if (!res.ok) throw new Error("Failed to initialize secure session")
 
       toast({
         title: "Account Created!",

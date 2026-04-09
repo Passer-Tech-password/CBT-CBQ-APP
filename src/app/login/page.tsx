@@ -52,15 +52,18 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const { user } = await signInWithEmailAndPassword(auth, values.email, values.password)
-      
-      // Fetch user role
-      const userDoc = await getDoc(doc(db, "users", user.uid))
-      const userData = userDoc.data()
-      const role = userData?.role || "student"
+      const idToken = await user.getIdToken()
 
-      // Set role cookie for middleware
-      document.cookie = `user-role=${role}; path=/; max-age=3600; SameSite=Lax`
-      document.cookie = `auth-token=${user.uid}; path=/; max-age=3600; SameSite=Lax`
+      // Securely set session cookie via API
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      })
+
+      if (!res.ok) throw new Error("Failed to initialize secure session")
+
+      const { role } = await res.json()
 
       toast({
         title: "Welcome back!",

@@ -46,11 +46,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter()
 
   const handleSignOut = async () => {
-    // Clear cookies first
-    document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    document.cookie = "user-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    await signOut(auth)
-    router.push("/login")
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+      await signOut(auth)
+      router.push("/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
   }
 
   return (

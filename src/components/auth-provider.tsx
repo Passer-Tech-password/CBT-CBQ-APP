@@ -40,19 +40,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user)
       
       if (user) {
-        try {
-          // Fetch user role and other data from Firestore
-          const userDocRef = doc(db, "users", user.uid)
-          const userDoc = await getDoc(userDocRef)
-          
-          if (userDoc.exists()) {
-            setUserData(userDoc.data() as UserData)
-          } else {
-            console.warn("User document not found in Firestore for uid:", user.uid)
-            setUserData(null)
+        let attempts = 0
+        const maxAttempts = 3
+        const timeoutMs = 5000 // 5 seconds timeout
+
+        const fetchUserData = async () => {
+          try {
+            const userDocRef = doc(db, "users", user.uid)
+            
+            // Timeout mechanism using Promise.race
+            const userDoc = await Promise.race([
+              getDoc(userDocRef),
+              new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error("Firestore fetch timeout")), timeoutMs)
+              )
+            ])
+            
+            if (userDoc.exists()) {
+              setUserData(userDoc.data() as UserData)
+              return true
+            } else {
+              console.warn("User document not found in Firestore for uid:", user.uid)
+              setUserData(null)
+              return true
+            }
+          } catch (error) {
+            console.error(`Error fetching user data (Attempt ${attempts + 1}/${maxAttempts}):`, error)
+            return false
           }
-        } catch (error) {
-          console.error("Error fetching user data from Firestore:", error)
+        }
+
+        while (attempts < maxAttempts) {
+          const success = await fetchUserData()
+          if (success) break
+          attempts++
+          if (attempts < maxAttempts) {
+            // Wait before retry (exponential backoff could be added here)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts))
+          }
+        }
+
+        if (attempts === maxAttempts) {
+          console.error("Max retry attempts reached for Firestore fetch.")
           setUserData(null)
         }
       } else {
