@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import AdminLayout from "@/components/admin/admin-layout"
 import { cn } from "@/lib/utils"
 
 interface Question {
@@ -138,8 +137,7 @@ export default function QuizBuilderPage() {
   )
 
   return (
-    <AdminLayout>
-      <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
@@ -366,6 +364,6 @@ export default function QuizBuilderPage() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </>
   )
 }

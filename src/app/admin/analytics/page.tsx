@@ -51,7 +51,6 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import AdminLayout from "@/components/admin/admin-layout"
 import { cn } from "@/lib/utils"
 
 // Mock data for analytics
@@ -101,8 +100,7 @@ export default function AdminAnalyticsPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-10 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-10 animate-in fade-in duration-500 pb-10">
         {/* Header */}
         <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -347,6 +345,5 @@ export default function AdminAnalyticsPage() {
           </Card>
         </div>
       </div>
-    </AdminLayout>
   )
 }

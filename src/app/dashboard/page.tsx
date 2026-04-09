@@ -1,40 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { auth, db } from "@/lib/firebase"
-import { onAuthStateChanged } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
-import { Loader2, Sparkles, Trophy, Calendar, ArrowRight, User } from "lucide-react"
+import { Sparkles, Trophy, Calendar, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
 
-import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { SubjectGrid } from "@/components/dashboard/subject-grid"
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAuth } from "@/components/auth-provider"
 
 export default function DashboardPage() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [userData, setUserData] = useState<any>(null)
-  const router = useRouter()
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid))
-        if (userDoc.exists()) {
-          setUserData(userDoc.data())
-        }
-        setIsLoading(false)
-      } else {
-        router.push("/login")
-      }
-    })
-
-    return () => unsubscribe()
-  }, [router])
+  const { userData } = useAuth()
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours()
@@ -43,52 +19,45 @@ export default function DashboardPage() {
     return "Good evening"
   }
 
-  if (isLoading) {
-    return <DashboardSkeleton />
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 md:pb-8">
-      <DashboardNavbar />
-      
-      <main className="container px-4 md:px-8 py-8 space-y-8">
-        {/* Welcome Section */}
-        <section className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="flex items-center space-x-2 text-primary font-semibold mb-1">
-              <Sparkles className="h-4 w-4" />
-              <span className="text-sm uppercase tracking-wider">Student Dashboard</span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-              {getTimeGreeting()}, {userData?.fullName?.split(' ')[0] || "Passer"} 👋
-            </h1>
-            <p className="text-slate-500 mt-2 text-lg">
-              You're doing great! Ready to challenge yourself today?
-            </p>
-          </motion.div>
+    <main className="container px-4 md:px-8 py-8 space-y-8">
+      {/* Welcome Section */}
+      <section className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center space-x-2 text-primary font-semibold mb-1">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-sm uppercase tracking-wider">Student Dashboard</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+            {getTimeGreeting()}, {userData?.fullName?.split(' ')[0] || "Passer"} 👋
+          </h1>
+          <p className="text-slate-500 mt-2 text-lg">
+            You're doing great! Ready to challenge yourself today?
+          </p>
+        </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center space-x-3"
-          >
-            <div className="flex flex-col items-end text-right">
-              <span className="text-sm font-bold text-slate-900 flex items-center">
-                <Calendar className="h-4 w-4 mr-2 text-primary" />
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-              </span>
-              <span className="text-xs text-slate-500 font-medium uppercase tracking-tighter">Academic Year 2026/2027</span>
-            </div>
-          </motion.div>
-        </section>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex items-center space-x-3"
+        >
+          <div className="flex flex-col items-end text-right">
+            <span className="text-sm font-bold text-slate-900 flex items-center">
+              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </span>
+            <span className="text-xs text-slate-500 font-medium uppercase tracking-tighter">Academic Year 2026/2027</span>
+          </div>
+        </motion.div>
+      </section>
 
-        {/* Stats Section */}
-        <StatsCards stats={userData?.stats} />
+      {/* Stats Section */}
+      <StatsCards stats={userData?.stats} />
 
         {/* Quick Action & Competition Banner */}
         <section className="grid md:grid-cols-3 gap-6">
@@ -166,34 +135,6 @@ export default function DashboardPage() {
         {/* Subjects Grid */}
         <SubjectGrid />
       </main>
-
-      {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t px-6 py-3 flex items-center justify-between z-50">
-        <Button variant="ghost" size="icon" className="text-primary flex flex-col items-center h-auto py-1">
-          <div className="p-2 rounded-xl bg-primary/10 mb-1">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <span className="text-[10px] font-bold">Home</span>
-        </Button>
-        <Button variant="ghost" size="icon" className="text-slate-400 flex flex-col items-center h-auto py-1">
-          <div className="p-2 mb-1">
-            <Trophy className="h-6 w-6" />
-          </div>
-          <span className="text-[10px] font-bold">Quiz</span>
-        </Button>
-        <Button variant="ghost" size="icon" className="text-slate-400 flex flex-col items-center h-auto py-1">
-          <div className="p-2 mb-1">
-            <Calendar className="h-6 w-6" />
-          </div>
-          <span className="text-[10px] font-bold">Exam</span>
-        </Button>
-        <Button variant="ghost" size="icon" className="text-slate-400 flex flex-col items-center h-auto py-1">
-          <div className="p-2 mb-1">
-            <User className="h-6 w-6" />
-          </div>
-          <span className="text-[10px] font-bold">Profile</span>
-        </Button>
-      </nav>
-    </div>
+    </>
   )
 }

@@ -20,7 +20,6 @@ import {
 import { motion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
-import AdminLayout from "@/components/admin/admin-layout"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -127,8 +126,7 @@ export default function QuestionsManagementPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout>
-        <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-8 animate-in fade-in duration-500">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <Skeleton className="h-10 w-64" />
@@ -151,13 +149,11 @@ export default function QuestionsManagementPage() {
             </div>
           </Card>
         </div>
-      </AdminLayout>
     )
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -466,6 +462,6 @@ export default function QuestionsManagementPage() {
           </div>
         </Card>
       </div>
-    </AdminLayout>
+    </>
   )
 }

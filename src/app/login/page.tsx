@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { GraduationCap, Lock, Mail, Loader2 } from "lucide-react"
 import { motion } from "framer-motion"
+import Image from "next/image"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -21,8 +22,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { auth } from "@/lib/firebase"
+import { auth, db } from "@/lib/firebase"
 import { signInWithEmailAndPassword } from "firebase/auth"
+import { doc, getDoc } from "firebase/firestore"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -49,12 +51,28 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password)
+      const { user } = await signInWithEmailAndPassword(auth, values.email, values.password)
+      
+      // Fetch user role
+      const userDoc = await getDoc(doc(db, "users", user.uid))
+      const userData = userDoc.data()
+      const role = userData?.role || "student"
+
+      // Set role cookie for middleware
+      document.cookie = `user-role=${role}; path=/; max-age=3600; SameSite=Lax`
+      document.cookie = `auth-token=${user.uid}; path=/; max-age=3600; SameSite=Lax`
+
       toast({
         title: "Welcome back!",
-        description: "Successfully logged into your account.",
+        description: `Successfully logged in as ${role}.`,
       })
-      router.push("/dashboard")
+      
+      // Redirect based on role
+      if (role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/dashboard")
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -92,8 +110,13 @@ export default function LoginPage() {
           <div className="flex items-center space-x-4">
             <div className="flex -space-x-2">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-10 w-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`} alt="Avatar" />
+                <div key={i} className="h-10 w-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden relative">
+                  <Image 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`} 
+                    alt={`Avatar ${i}`}
+                    fill
+                    className="object-cover"
+                  />
                 </div>
               ))}
             </div>

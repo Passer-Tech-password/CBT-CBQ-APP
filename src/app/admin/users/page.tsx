@@ -60,7 +60,6 @@ import {
   SelectValue 
 } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import AdminLayout from "@/components/admin/admin-layout"
 import { cn } from "@/lib/utils"
 
 // Mock user data
@@ -107,8 +106,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-10 animate-in fade-in duration-500">
+    <div className="space-y-10 animate-in fade-in duration-500">
         {/* Header */}
         <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -306,6 +304,6 @@ export default function AdminUsersPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </>
   )
 }

@@ -16,13 +16,17 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/components/auth-provider"
 
 export function DashboardNavbar() {
   const router = useRouter()
-  const user = auth.currentUser
+  const { user, userData } = useAuth()
   const { isOnline, isSyncing, syncPendingResults } = useOfflineSync()
 
   const handleSignOut = async () => {
+    // Clear cookies first
+    document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    document.cookie = "user-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
     await signOut(auth)
     router.push("/login")
   }
@@ -65,7 +69,7 @@ export function DashboardNavbar() {
 
         <div className="flex items-center space-x-4 md:space-x-6">
           <div className="hidden md:flex flex-col items-end text-right">
-            <p className="text-sm font-bold leading-none">Good morning, {user?.displayName?.split(' ')[0] || "Passer"} 👋</p>
+            <p className="text-sm font-bold leading-none">Good morning, {userData?.fullName?.split(' ')[0] || "Passer"} 👋</p>
             <p className="text-[10px] font-medium text-white/60 uppercase tracking-widest mt-1">Student Account</p>
           </div>
 
@@ -78,9 +82,9 @@ export function DashboardNavbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-12 w-12 rounded-2xl p-0 hover:bg-white/10 transition-all active:scale-95">
                 <Avatar className="h-12 w-12 border-2 border-white/20 shadow-xl">
-                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} alt={user?.displayName || "User"} />
+                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} alt={userData?.fullName || "User"} />
                   <AvatarFallback className="bg-white text-primary font-black">
-                    {user?.displayName?.[0] || user?.email?.[0] || "U"}
+                    {userData?.fullName?.[0] || user?.email?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -88,7 +92,7 @@ export function DashboardNavbar() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.displayName || "Student"}</p>
+                  <p className="text-sm font-medium leading-none">{userData?.fullName || "Student"}</p>
                   <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>

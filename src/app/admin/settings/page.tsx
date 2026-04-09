@@ -29,7 +29,6 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import AdminLayout from "@/components/admin/admin-layout"
 import { cn } from "@/lib/utils"
 
 export default function AdminSettingsPage() {
@@ -55,8 +54,7 @@ export default function AdminSettingsPage() {
   ]
 
   return (
-    <AdminLayout>
-      <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
+    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
         {/* Header */}
         <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -337,6 +335,6 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
       </div>
-    </AdminLayout>
+    </>
   )
 }

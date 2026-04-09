@@ -26,7 +26,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import AdminLayout from "@/components/admin/admin-layout"
 import { cn } from "@/lib/utils"
 
 // Mock data for Admin Dashboard
@@ -56,152 +55,168 @@ const STATS_CARDS = [
 
 export default function AdminDashboardPage() {
   return (
-    <AdminLayout>
-      <div className="space-y-10">
-        {/* Welcome & Overview Header */}
-        <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-10">
+      {/* Welcome & Overview Header */}
+      <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">System Overview</h1>
+          <p className="text-slate-500 font-bold mt-1 text-lg">Real-time performance metrics and student activity.</p>
+        </motion.div>
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" className="h-12 px-6 rounded-2xl border-4 border-slate-100 font-black shadow-xl hover:bg-slate-50">
+            Download CSV
+          </Button>
+          <Button className="h-12 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black shadow-xl shadow-primary/20">
+            Generate Report
+          </Button>
+        </div>
+      </section>
+
+      {/* Stats Grid */}
+      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        {STATS_CARDS.map((stat, idx) => (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            key={stat.label}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1 }}
           >
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">System Overview</h1>
-            <p className="text-slate-500 font-bold mt-1 text-lg">Real-time performance metrics and student activity.</p>
+            <Card className="border-none shadow-xl shadow-slate-200/50 bg-white rounded-[2.5rem] p-8 overflow-hidden relative group">
+              <div className={cn("absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110", stat.bg)} />
+              <div className="relative z-10">
+                <div className={cn("p-4 rounded-2xl inline-block mb-6 shadow-inner", stat.bg)}>
+                  <stat.icon className={cn("h-7 w-7", stat.color)} />
+                </div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{stat.label}</p>
+                <div className="flex items-end justify-between">
+                  <div className="text-4xl font-black text-slate-900">{stat.value}</div>
+                  <div className={cn(
+                    "flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    stat.isPositive ? "bg-emerald-50 text-accent" : "bg-red-50 text-red-500"
+                  )}>
+                    {stat.isPositive ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
+                    {stat.trend}
+                  </div>
+                </div>
+              </div>
+            </Card>
           </motion.div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" className="h-12 px-6 rounded-2xl border-4 border-slate-100 font-black shadow-xl hover:bg-slate-50">
-              Download CSV
+        ))}
+      </section>
+
+      {/* Charts & Table Section */}
+      <section className="grid lg:grid-cols-3 gap-8">
+        {/* Main Chart */}
+        <Card className="lg:col-span-2 border-none shadow-xl shadow-slate-200/50 bg-white rounded-[2.5rem] p-8">
+          <CardHeader className="px-0 pt-0 pb-8 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl font-black text-slate-900">Platform Growth</CardTitle>
+              <CardDescription className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Monthly student engagement analysis</CardDescription>
+            </div>
+            <div className="flex bg-slate-50 p-1 rounded-xl">
+              <Button variant="ghost" size="sm" className="rounded-lg h-8 px-4 font-black text-[10px] uppercase bg-white shadow-sm">Engagement</Button>
+              <Button variant="ghost" size="sm" className="rounded-lg h-8 px-4 font-black text-[10px] uppercase text-slate-400">Activity</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="px-0 pb-0 h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={TREND_DATA}>
+                <defs>
+                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }}
+                  dx={-10}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '1.5rem', 
+                    border: 'none', 
+                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                    padding: '1rem'
+                  }}
+                  itemStyle={{ color: 'hsl(var(--primary))', fontWeight: 900 }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="score" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={4} 
+                  fillOpacity={1} 
+                  fill="url(#colorScore)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Recent Results */}
+        <Card className="border-none shadow-xl shadow-slate-200/50 bg-white rounded-[2.5rem] p-8 overflow-hidden flex flex-col">
+          <CardHeader className="px-0 pt-0 pb-8 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl font-black text-slate-900">Recent Activity</CardTitle>
+              <CardDescription className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Live performance feed</CardDescription>
+            </div>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400">
+              <MoreVertical className="h-5 w-5" />
             </Button>
-            <Button className="h-12 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black shadow-xl shadow-primary/20">
-              Generate Report
+          </CardHeader>
+          <CardContent className="px-0 pb-0 flex-1 space-y-6">
+            {RECENT_RESULTS.map((result) => (
+              <div key={result.id} className="flex items-center justify-between group cursor-pointer p-2 -m-2 rounded-2xl hover:bg-slate-50 transition-colors">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Avatar className="h-14 w-14 border-4 border-white shadow-xl">
+                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${result.avatar}`} />
+                      <AvatarFallback className="font-black bg-slate-100">{result.student[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className={cn(
+                      "absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-white shadow-lg flex items-center justify-center",
+                      result.status === "excellent" ? "bg-emerald-500" : "bg-blue-500"
+                    )}>
+                      <CheckCircle2 className="h-3 w-3 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 group-hover:text-primary transition-colors">{result.student}</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{result.subject}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-black text-slate-900">{result.score}%</div>
+                  <div className="flex items-center justify-end text-[8px] font-black uppercase tracking-tighter text-slate-400">
+                    <TrendingUp className="h-2 w-2 mr-1 text-emerald-500" />
+                    Increased
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+          <div className="pt-8 mt-auto border-t border-slate-50">
+            <Button className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow-xl shadow-slate-900/10 group">
+              View All Activities
+              <ChevronRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Button>
           </div>
-        </section>
-
-        {/* Stats Grid */}
-        <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          {STATS_CARDS.map((stat, idx) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: idx * 0.1 }}
-            >
-              <Card className="border-none shadow-xl shadow-slate-200/50 bg-white rounded-[2.5rem] p-8 overflow-hidden relative group">
-                <div className={cn("absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110", stat.bg)} />
-                <div className="relative z-10">
-                  <div className={cn("p-4 rounded-2xl inline-block mb-6 shadow-inner", stat.bg)}>
-                    <stat.icon className={cn("h-7 w-7", stat.color)} />
-                  </div>
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{stat.label}</p>
-                  <div className="flex items-end justify-between">
-                    <div className="text-4xl font-black text-slate-900">{stat.value}</div>
-                    <div className={cn(
-                      "flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-                      stat.isPositive ? "bg-emerald-50 text-accent" : "bg-red-50 text-red-500"
-                    )}>
-                      {stat.isPositive ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-                      {stat.trend}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </section>
-
-        {/* Charts and Tables */}
-        <div className="grid lg:grid-cols-5 gap-10">
-          {/* Main Chart Card */}
-          <Card className="lg:col-span-3 border-none shadow-2xl shadow-slate-200/50 bg-white rounded-[3rem] p-10">
-            <CardHeader className="p-0 mb-10 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl font-black text-slate-900">Score Trends</CardTitle>
-                <CardDescription className="text-slate-500 font-bold">Overall performance growth this month</CardDescription>
-              </div>
-              <Button variant="ghost" size="icon" className="text-slate-400">
-                <MoreVertical className="h-6 w-6" />
-              </Button>
-            </CardHeader>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={TREND_DATA}>
-                  <defs>
-                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#1E3A8A" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#1E3A8A" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 800 }} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 800 }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.2)', padding: '1.5rem' }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="score" 
-                    stroke="#1E3A8A" 
-                    strokeWidth={6} 
-                    fillOpacity={1} 
-                    fill="url(#colorScore)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          {/* Recent Activity Table Card */}
-          <Card className="lg:col-span-2 border-none shadow-2xl shadow-slate-200/50 bg-white rounded-[3rem] p-10 overflow-hidden flex flex-col">
-            <CardHeader className="p-0 mb-8 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl font-black text-slate-900">Recent Activity</CardTitle>
-                <CardDescription className="text-slate-500 font-bold">Latest student submissions</CardDescription>
-              </div>
-              <Button variant="ghost" className="text-primary font-black hover:bg-primary/5 rounded-xl">
-                View All
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-y-auto space-y-4 pr-2">
-              {RECENT_RESULTS.map((result) => (
-                <div key={result.id} className="flex items-center justify-between p-5 rounded-[2rem] hover:bg-slate-50 transition-all cursor-pointer group border-2 border-transparent hover:border-slate-100">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-12 w-12 border-2 border-white shadow-lg">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${result.avatar}`} />
-                      <AvatarFallback className="bg-primary text-white font-black">{result.student[0]}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-black text-slate-900 group-hover:text-primary transition-colors">{result.student}</p>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{result.subject}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-black text-slate-900">{result.score}%</div>
-                    <div className={cn(
-                      "text-[10px] font-black uppercase tracking-widest mt-1",
-                      result.status === 'excellent' ? "text-accent" : "text-blue-500"
-                    )}>
-                      {result.status}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-            <Button className="w-full mt-6 h-14 rounded-2xl bg-slate-50 text-slate-500 border-4 border-slate-100 font-black hover:bg-primary hover:text-white hover:border-primary transition-all">
-              Manage All Results
-              <ChevronRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Card>
-        </div>
-      </div>
-    </AdminLayout>
+        </Card>
+      </section>
+    </div>
   )
 }

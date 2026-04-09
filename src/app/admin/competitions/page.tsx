@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 
-import AdminLayout from "@/components/admin/admin-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import {
@@ -101,8 +100,7 @@ export default function CompetitionsManagementPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Competitions</h1>
@@ -260,6 +258,6 @@ export default function CompetitionsManagementPage() {
           ))}
         </div>
       </div>
-    </AdminLayout>
+    </>
   )
 }

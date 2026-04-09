@@ -84,6 +84,10 @@ export default function RegisterPage() {
         }
       })
 
+      // Set role cookie for middleware
+      document.cookie = `user-role=student; path=/; max-age=3600; SameSite=Lax`
+      document.cookie = `auth-token=${user.uid}; path=/; max-age=3600; SameSite=Lax`
+
       toast({
         title: "Account Created!",
         description: "Welcome to CBT & CBQ. Start your journey today!",
