@@ -31,6 +31,7 @@ import {
 import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { cn } from "@/lib/utils"
 import { exportToPDF } from "@/lib/pdf-export"
+import { ResultReport } from "@/components/dashboard/result-report"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/components/auth-provider"
