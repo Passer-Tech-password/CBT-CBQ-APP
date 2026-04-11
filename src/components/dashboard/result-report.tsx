@@ -3,6 +3,7 @@
 import { CheckCircle2, XCircle, Clock, GraduationCap, Target } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
 
 interface Question {
   id: number
