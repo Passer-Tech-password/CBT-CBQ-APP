@@ -54,7 +54,8 @@ export default function AdminSettingsPage() {
   ]
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
+    <div className="admin-settings-container">
+      <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
         {/* Header */}
         <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -335,6 +336,6 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
       </div>
-    </>
+    </div>
   )
 }

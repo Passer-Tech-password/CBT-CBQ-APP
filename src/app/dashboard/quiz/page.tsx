@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   AlertTriangle
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { doc, setDoc, collection, addDoc, updateDoc, increment } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useAuth } from "@/components/auth-provider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/components/ui/use-toast"
@@ -84,46 +86,75 @@ function QuizContent() {
   const currentQuestion = MOCK_QUESTIONS[currentQuestionIdx]
   const progress = ((currentQuestionIdx + 1) / MOCK_QUESTIONS.length) * 100
 
+  const { user } = useAuth()
+
   const handleFinish = useCallback(async () => {
     if (isSubmitting || isFinished) return
     setIsSubmitting(true)
-    
-    // Simulate network delay for submission
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    setIsFinished(true)
-    setIsSubmitting(false)
     
     const score = MOCK_QUESTIONS.reduce((acc, q) => 
       selectedAnswers[q.id] === q.correctAnswer ? acc + 1 : acc, 0
     )
     const percentage = (score / MOCK_QUESTIONS.length) * 100
 
-    if (percentage >= 90) {
-      const duration = 3 * 1000
-      const animationEnd = Date.now() + duration
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 }
-
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min
-
-      const interval: any = setInterval(function() {
-        const timeLeft = animationEnd - Date.now()
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval)
+    try {
+      if (user) {
+        // Save result to Firestore
+        const resultData = {
+          uid: user.uid,
+          subject,
+          mode,
+          score: percentage,
+          correctAnswers: score,
+          totalQuestions: MOCK_QUESTIONS.length,
+          timeTaken: formatTime(600 - timeLeft),
+          completedAt: new Date().toISOString(),
+          accuracy: Math.round((score / MOCK_QUESTIONS.length) * 100),
+          questions: MOCK_QUESTIONS.map(q => ({
+            id: q.id,
+            question: q.question,
+            userAnswer: selectedAnswers[q.id] || "No Answer",
+            correctAnswer: q.correctAnswer,
+            isCorrect: selectedAnswers[q.id] === q.correctAnswer,
+            explanation: q.explanation
+          }))
         }
 
-        const particleCount = 50 * (timeLeft / duration)
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#1E3A8A', '#10B981'] })
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#1E3A8A', '#10B981'] })
-      }, 250)
-    }
+        const resultRef = await addDoc(collection(db, "results"), resultData)
+        
+        // Update user stats
+        const userRef = doc(db, "users", user.uid)
+        await updateDoc(userRef, {
+          "stats.testsTaken": increment(1),
+          [`stats.${mode === 'competition' ? 'cbqCompetition' : mode === 'timed' ? 'timedExam' : 'practiceMode'}`]: increment(1)
+        })
 
-    toast({
-      title: "Test Submitted Successfully",
-      description: `You scored ${percentage}% in ${subject} ${mode}.`,
-    })
-  }, [isSubmitting, isFinished, toast, selectedAnswers, subject, mode])
+        toast({
+          title: "Test Submitted Successfully",
+          description: `You scored ${percentage}% in ${subject} ${mode}.`,
+        })
+      }
+    } catch (error: any) {
+      console.error("Submission error:", error)
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: "There was an error saving your results. Please try again.",
+      })
+    } finally {
+      setIsFinished(true)
+      setIsSubmitting(false)
+      
+      if (percentage >= 90) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#1E3A8A', '#10B981']
+        })
+      }
+    }
+  }, [isSubmitting, isFinished, toast, selectedAnswers, subject, mode, user, timeLeft])
 
   // Improved Timer logic
   useEffect(() => {

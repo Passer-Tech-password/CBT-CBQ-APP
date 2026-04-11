@@ -31,6 +31,9 @@ import {
 import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { cn } from "@/lib/utils"
 import { exportToPDF } from "@/lib/pdf-export"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useAuth } from "@/components/auth-provider"
 
 // Mock results data for development
 const MOCK_RESULTS = {
@@ -73,56 +76,83 @@ const MOCK_RESULTS = {
 function ResultsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const subject = searchParams.get("subject") || "Mathematics"
-  const [showConfetti, setShowConfetti] = useState(true)
+  const resultId = searchParams.get("id")
+  const subjectParam = searchParams.get("subject")
+  
+  const [result, setResult] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const { toast } = useToast()
-
-  const data = [
-    { name: "Correct", value: MOCK_RESULTS.correctAnswers, color: "#10B981" },
-    { name: "Incorrect", value: MOCK_RESULTS.incorrectAnswers, color: "#EF4444" }
-  ]
+  const { user } = useAuth()
 
   useEffect(() => {
-    if (MOCK_RESULTS.score >= 90) {
-      const duration = 3 * 1000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+    async function fetchResult() {
+      if (!resultId) {
+        setResult(MOCK_RESULTS)
+        setIsLoading(false)
+        return
+      }
 
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-      const interval = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          return;
+      try {
+        const docRef = doc(db, "results", resultId)
+        const docSnap = await getDoc(docRef)
+        
+        if (docSnap.exists()) {
+          setResult(docSnap.data())
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Result Not Found",
+            description: "We couldn't find the requested result details.",
+          })
+          setResult(MOCK_RESULTS)
         }
-
-        const particleCount = 50 * (timeLeft / duration);
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-      }, 250);
+      } catch (error) {
+        console.error("Error fetching result:", error)
+        setResult(MOCK_RESULTS)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [])
+
+    fetchResult()
+  }, [resultId, toast])
+
+  useEffect(() => {
+    if (result && result.score >= 90) {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#1E3A8A', '#10B981']
+      })
+    }
+  }, [result])
+
+  const subject = subjectParam || result?.subject || "Examination"
+
+  const chartData = result ? [
+    { name: "Correct", value: result.correctAnswers, color: "#10B981" },
+    { name: "Incorrect", value: result.incorrectAnswers, color: "#EF4444" }
+  ] : []
 
   const handleTakeAnother = () => {
     router.push("/dashboard")
   }
 
   const handleRetry = () => {
-    // Navigate back to the quiz with the same subject and mode
     router.push(`/dashboard/mode-selection?subject=${subject}`)
   }
 
   const handleExportPDF = async () => {
+    if (!result) return
     setIsExporting(true)
     toast({
       title: "Generating PDF",
       description: "Please wait while we prepare your official result report...",
     })
     
-    const success = await exportToPDF("pdf-report-content", `${MOCK_RESULTS.studentName}-${subject}-Result.pdf`)
+    const success = await exportToPDF("pdf-report-content", `${result.studentName || user?.displayName || 'Student'}-${subject}-Result.pdf`)
     
     setIsExporting(false)
     if (success) {
@@ -139,124 +169,26 @@ function ResultsContent() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-12 w-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-slate-500 font-bold animate-pulse">Loading Results...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!result) return null
+
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
       <DashboardNavbar />
       
       {/* Hidden PDF Content - Optimized for Export */}
       <div className="fixed left-[-9999px] top-0">
-        <div id="pdf-report-content" className="w-[800px] bg-white p-12 text-slate-900 font-sans">
-          {/* PDF Header */}
-          <div className="flex items-center justify-between border-b-4 border-accent pb-8 mb-10">
-            <div className="flex items-center space-x-4">
-              <div className="bg-primary p-3 rounded-2xl shadow-lg">
-                <GraduationCap className="h-10 w-10 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-primary tracking-tighter">CBT & CBQ</h1>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Excellence Platform</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Official Report</div>
-              <div className="text-lg font-bold text-slate-900">{MOCK_RESULTS.date}</div>
-            </div>
-          </div>
-
-          {/* Student Info & Score */}
-          <div className="grid grid-cols-2 gap-10 mb-12">
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Student Name</p>
-                <h2 className="text-4xl font-black text-slate-900 tracking-tight">{MOCK_RESULTS.studentName}</h2>
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Subject Category</p>
-                <h3 className="text-2xl font-bold text-primary">{subject}</h3>
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-[2.5rem] p-8 flex flex-col items-center justify-center border-2 border-slate-100 shadow-inner">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Final Score</p>
-              <div className="text-7xl font-black text-primary tracking-tighter">{MOCK_RESULTS.score}%</div>
-              <div className="mt-4 px-6 py-2 bg-accent text-white rounded-full font-black text-sm uppercase tracking-widest shadow-lg">
-                Excellent Performance
-              </div>
-            </div>
-          </div>
-
-          {/* Metrics Row */}
-          <div className="grid grid-cols-3 gap-6 mb-12">
-            {[
-              { label: "Correct", value: MOCK_RESULTS.correctAnswers, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50" },
-              { label: "Incorrect", value: MOCK_RESULTS.incorrectAnswers, icon: XCircle, color: "text-red-500", bg: "bg-red-50" },
-              { label: "Time Taken", value: MOCK_RESULTS.timeTaken, icon: Clock, color: "text-blue-500", bg: "bg-blue-50" },
-            ].map((stat) => (
-              <div key={stat.label} className="p-6 rounded-[2rem] bg-white border-2 border-slate-50 shadow-sm flex items-center space-x-4">
-                <div className={cn("p-3 rounded-xl", stat.bg)}>
-                  <stat.icon className={cn("h-6 w-6", stat.color)} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                  <p className="text-xl font-black text-slate-900">{stat.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Question List */}
-          <div className="space-y-8">
-            <h4 className="text-xl font-black text-slate-900 border-b-2 border-slate-100 pb-4 mb-6 uppercase tracking-widest">Question Breakdown</h4>
-            {MOCK_RESULTS.questions.map((q, idx) => (
-              <div key={q.id} className="p-8 rounded-[2rem] bg-slate-50/50 border-2 border-slate-50 break-inside-avoid">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-8 w-8 rounded-lg bg-primary text-white flex items-center justify-center font-black text-xs shadow-md">
-                      {idx + 1}
-                    </div>
-                    <p className="text-lg font-bold text-slate-900 leading-tight">{q.question}</p>
-                  </div>
-                  <div className={cn(
-                    "px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest shadow-sm",
-                    q.isCorrect ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
-                  )}>
-                    {q.isCorrect ? "Correct" : "Incorrect"}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-8 ml-12">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">User Response</p>
-                      <div className={cn(
-                        "font-bold text-lg",
-                        q.isCorrect ? "text-emerald-600" : "text-red-600 line-through"
-                      )}>{q.userAnswer}</div>
-                    </div>
-                    {!q.isCorrect && (
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Correct Answer</p>
-                        <div className="font-bold text-lg text-emerald-600">{q.correctAnswer}</div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-white/50 p-6 rounded-2xl border-2 border-slate-100">
-                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Educational Explanation</p>
-                    <p className="text-slate-600 font-bold text-sm leading-relaxed">{q.explanation}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* PDF Footer */}
-          <div className="mt-16 pt-8 border-t-2 border-slate-100 text-center">
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">
-              This is a computer-generated official result report from the CBT & CBQ Excellence Platform.
-            </p>
-            <p className="text-slate-300 font-medium text-[10px] mt-2 italic">
-              Verification Code: CBT-RESULT-{Math.random().toString(36).substring(2, 10).toUpperCase()}
-            </p>
-          </div>
-        </div>
+        <ResultReport data={result} subject={subject} />
       </div>
 
       <main className="container px-4 md:px-8 py-10 max-w-6xl mx-auto space-y-10">
@@ -272,9 +204,11 @@ function ResultsContent() {
             <div className="relative bg-white p-8 rounded-[3rem] shadow-2xl border-4 border-accent/20">
               <Trophy className="h-20 w-20 text-accent drop-shadow-lg mx-auto mb-4" />
               <div className="text-6xl font-black text-slate-900 tracking-tighter">
-                {MOCK_RESULTS.score}%
+                {result.score}%
               </div>
-              <p className="text-accent font-black uppercase tracking-[0.2em] text-sm mt-2">Excellent!</p>
+              <p className="text-accent font-black uppercase tracking-[0.2em] text-sm mt-2">
+                {result.score >= 90 ? "Excellent!" : result.score >= 70 ? "Great Job!" : result.score >= 50 ? "Passed" : "Needs Practice"}
+              </p>
             </div>
           </motion.div>
 
@@ -299,7 +233,7 @@ function ResultsContent() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={data}
+                    data={chartData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -307,7 +241,7 @@ function ResultsContent() {
                     paddingAngle={8}
                     dataKey="value"
                   >
-                    {data.map((entry, index) => (
+                    {chartData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                     ))}
                   </Pie>
@@ -317,7 +251,7 @@ function ResultsContent() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-3xl font-black text-slate-900">{MOCK_RESULTS.accuracy}%</span>
+                <span className="text-3xl font-black text-slate-900">{result.accuracy}%</span>
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Correct</span>
               </div>
             </CardContent>
@@ -332,7 +266,7 @@ function ResultsContent() {
                 </div>
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Time Taken</span>
               </div>
-              <div className="text-4xl font-black text-slate-900">{MOCK_RESULTS.timeTaken}</div>
+              <div className="text-4xl font-black text-slate-900">{result.timeTaken}</div>
               <p className="text-sm font-bold text-slate-500 mt-2">Ahead of 85% students</p>
             </Card>
 
@@ -343,7 +277,7 @@ function ResultsContent() {
                 </div>
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Efficiency</span>
               </div>
-              <div className="text-4xl font-black text-slate-900">{MOCK_RESULTS.correctAnswers} / {MOCK_RESULTS.totalQuestions}</div>
+              <div className="text-4xl font-black text-slate-900">{result.correctAnswers} / {result.totalQuestions}</div>
               <p className="text-sm font-bold text-slate-500 mt-2">Questions answered</p>
             </Card>
           </div>
@@ -359,7 +293,7 @@ function ResultsContent() {
           </div>
 
           <Accordion type="single" collapsible className="w-full space-y-4 px-1">
-            {MOCK_RESULTS.questions.map((q, idx) => (
+            {result.questions?.map((q: any, idx: number) => (
               <AccordionItem 
                 key={q.id} 
                 value={`item-${q.id}`}

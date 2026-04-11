@@ -100,7 +100,8 @@ export default function CompetitionsManagementPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="competitions-container">
+      <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Competitions</h1>
@@ -258,6 +259,6 @@ export default function CompetitionsManagementPage() {
           ))}
         </div>
       </div>
-    </>
+    </div>
   )
 }

@@ -137,7 +137,8 @@ export default function QuizBuilderPage() {
   )
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="quiz-builder-container">
+      <div className="space-y-8 max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
@@ -364,6 +365,6 @@ export default function QuizBuilderPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

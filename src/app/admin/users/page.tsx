@@ -106,7 +106,8 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500">
+    <div className="users-management-container">
+      <div className="space-y-10 animate-in fade-in duration-500">
         {/* Header */}
         <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -304,6 +305,6 @@ export default function AdminUsersPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }

@@ -2,15 +2,41 @@
 
 import { Sparkles, Trophy, Calendar, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
 
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { SubjectGrid } from "@/components/dashboard/subject-grid"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
+import { useQuery } from "@tanstack/react-query"
+import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function DashboardPage() {
-  const { userData } = useAuth()
+  const { userData, user } = useAuth()
+  const router = useRouter()
+
+  // Prefetch recent activities using TanStack Query
+  const { data: recentActivities, isLoading: activitiesLoading } = useQuery({
+    queryKey: ['recentActivities', user?.uid],
+    queryFn: async () => {
+      if (!user?.uid) return []
+      const resultsRef = collection(db, "results")
+      const q = query(
+        resultsRef,
+        where("uid", "==", user.uid),
+        orderBy("completedAt", "desc"),
+        limit(3)
+      )
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+    },
+    enabled: !!user?.uid,
+  })
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours()
@@ -20,7 +46,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="container px-4 md:px-8 py-8 space-y-8">
+    <div className="dashboard-container">
+      <main className="container px-4 md:px-8 py-8 space-y-8">
       {/* Welcome Section */}
       <section className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <motion.div
@@ -107,26 +134,44 @@ export default function DashboardPage() {
                 <CardDescription>Your last 3 attempts</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {[
-                  { subject: "Mathematics", score: 85, date: "2h ago", type: "Practice" },
-                  { subject: "English", score: 92, date: "Yesterday", type: "Timed Exam" },
-                  { subject: "Science", score: 78, date: "2 days ago", type: "Practice" }
-                ].map((activity, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-primary group-hover:text-white transition-colors">
-                        <ArrowRight className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">{activity.subject}</p>
-                        <p className="text-xs text-slate-500">{activity.type} • {activity.date}</p>
+                {activitiesLoading ? (
+                  Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 rounded-lg bg-slate-100 animate-pulse" />
+                        <div className="space-y-2">
+                          <div className="h-3 w-24 bg-slate-100 animate-pulse rounded" />
+                          <div className="h-2 w-32 bg-slate-50 animate-pulse rounded" />
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-primary">{activity.score}%</p>
+                  ))
+                ) : (recentActivities?.length || 0) > 0 ? (
+                  recentActivities?.map((activity: any) => (
+                    <div 
+                      key={activity.id} 
+                      onClick={() => router.push(`/dashboard/results?id=${activity.id}&subject=${activity.subject}`)}
+                      className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-primary group-hover:text-white transition-colors">
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{activity.subject}</p>
+                          <p className="text-xs text-slate-500">{activity.mode} • {new Date(activity.completedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-primary">{activity.score}%</p>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No activities yet</p>
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -135,6 +180,6 @@ export default function DashboardPage() {
         {/* Subjects Grid */}
         <SubjectGrid />
       </main>
-    </>
+    </div>
   )
 }

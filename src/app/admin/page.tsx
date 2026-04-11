@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "framer-motion"
 import { 
   Users, 
@@ -10,23 +11,32 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   MoreVertical,
-  ChevronRight
+  ChevronRight,
+  Download
 } from "lucide-react"
 import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { ResultReport } from "@/components/dashboard/result-report"
+import { exportToPDF } from "@/lib/pdf-export"
+import { useToast } from "@/components/ui/use-toast"
 
 // Mock data for Admin Dashboard
 const TREND_DATA = [
@@ -46,6 +56,36 @@ const RECENT_RESULTS = [
   { id: 5, student: "Edward Norton", score: 95, subject: "Chemistry", status: "excellent", avatar: "Edward" }
 ]
 
+// Mock data for individual result detail
+const MOCK_RESULT_DETAIL = {
+  studentName: "Alice Johnson",
+  score: 92,
+  totalQuestions: 20,
+  correctAnswers: 18,
+  incorrectAnswers: 2,
+  timeTaken: "12:45",
+  accuracy: 90,
+  date: "April 12, 2026",
+  questions: [
+    {
+      id: 1,
+      question: "What is the result of 15 x 8?",
+      userAnswer: "120",
+      correctAnswer: "120",
+      isCorrect: true,
+      explanation: "15 multiplied by 8 equals 120."
+    },
+    {
+      id: 2,
+      question: "Solve for x: 2x + 10 = 30",
+      userAnswer: "10",
+      correctAnswer: "10",
+      isCorrect: true,
+      explanation: "Subtract 10 from both sides: 2x = 20. Divide by 2: x = 10."
+    }
+  ]
+}
+
 const STATS_CARDS = [
   { label: "Total Students", value: "2,450", icon: Users, trend: "+12.5%", isPositive: true, color: "text-blue-600", bg: "bg-blue-50" },
   { label: "Active Competitions", value: "18", icon: Trophy, trend: "+3", isPositive: true, color: "text-purple-600", bg: "bg-purple-50" },
@@ -54,8 +94,41 @@ const STATS_CARDS = [
 ]
 
 export default function AdminDashboardPage() {
+  const [selectedResult, setSelectedResult] = useState<any>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const { toast } = useToast()
+
+  const handleExportPDF = async () => {
+    if (!selectedResult) return
+    
+    setIsExporting(true)
+    toast({
+      title: "Generating PDF",
+      description: "Preparing the official result report...",
+    })
+    
+    const success = await exportToPDF("admin-pdf-report", `${selectedResult.student}-${selectedResult.subject}-Result.pdf`)
+    
+    setIsExporting(false)
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Report has been downloaded.",
+      })
+    }
+  }
+
   return (
     <div className="space-y-10">
+      {/* Hidden PDF Content for Admin Export */}
+      <div className="fixed left-[-9999px] top-0">
+        <ResultReport 
+          data={{...MOCK_RESULT_DETAIL, studentName: selectedResult?.student || "Student"}} 
+          subject={selectedResult?.subject || "Mathematics"}
+          id="admin-pdf-report"
+        />
+      </div>
+
       {/* Welcome & Overview Header */}
       <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <motion.div
@@ -180,7 +253,11 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="px-0 pb-0 flex-1 space-y-6">
             {RECENT_RESULTS.map((result) => (
-              <div key={result.id} className="flex items-center justify-between group cursor-pointer p-2 -m-2 rounded-2xl hover:bg-slate-50 transition-colors">
+              <div 
+                key={result.id} 
+                onClick={() => setSelectedResult(result)}
+                className="flex items-center justify-between group cursor-pointer p-2 -m-2 rounded-2xl hover:bg-slate-50 transition-colors"
+              >
                 <div className="flex items-center space-x-4">
                   <div className="relative">
                     <Avatar className="h-14 w-14 border-4 border-white shadow-xl">
@@ -199,16 +276,52 @@ export default function AdminDashboardPage() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{result.subject}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-black text-slate-900">{result.score}%</div>
-                  <div className="flex items-center justify-end text-[8px] font-black uppercase tracking-tighter text-slate-400">
-                    <TrendingUp className="h-2 w-2 mr-1 text-emerald-500" />
-                    Increased
+                <div className="text-right flex items-center space-x-4">
+                  <div>
+                    <div className="text-lg font-black text-slate-900">{result.score}%</div>
+                    <div className="flex items-center justify-end text-[8px] font-black uppercase tracking-tighter text-slate-400">
+                      <TrendingUp className="h-2 w-2 mr-1 text-emerald-500" />
+                      Increased
+                    </div>
                   </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
           </CardContent>
+
+          {/* Result Detail Dialog for Admin */}
+          <Dialog open={!!selectedResult} onOpenChange={(open) => !open && setSelectedResult(null)}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-0 border-none shadow-2xl">
+              <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md p-6 border-b flex items-center justify-between">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black text-slate-900">Result Detail</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    onClick={handleExportPDF} 
+                    disabled={isExporting}
+                    className="bg-[#10B981] hover:bg-[#0da673] text-white font-black rounded-xl"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {isExporting ? "Exporting..." : "Export PDF"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setSelectedResult(null)} className="font-black rounded-xl">
+                    Close
+                  </Button>
+                </div>
+              </div>
+              <div className="p-8 flex justify-center bg-slate-50">
+                <ResultReport 
+                  data={{...MOCK_RESULT_DETAIL, studentName: selectedResult?.student || "Student"}} 
+                  subject={selectedResult?.subject || "Mathematics"}
+                  id="admin-pdf-report-view"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
           <div className="pt-8 mt-auto border-t border-slate-50">
             <Button className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow-xl shadow-slate-900/10 group">
               View All Activities

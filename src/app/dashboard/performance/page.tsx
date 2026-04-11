@@ -21,6 +21,9 @@ import { Button } from "@/components/ui/button"
 import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { PerformanceSkeleton } from "@/components/dashboard/performance-skeleton"
 import { cn } from "@/lib/utils"
+import { exportToPDF } from "@/lib/pdf-export"
+import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/components/auth-provider"
 
 // Mock analytics data
 const TREND_DATA = [
@@ -44,6 +47,9 @@ const WEAKNESSES = ["Calculus", "Organic Chemistry", "World History"]
 
 export default function PerformancePage() {
   const [isLoading, setIsLoading] = useState(true)
+  const [isExporting, setIsExporting] = useState(false)
+  const { toast } = useToast()
+  const { userData } = useAuth()
 
   useEffect(() => {
     // Simulate loading data
@@ -51,11 +57,35 @@ export default function PerformancePage() {
     return () => clearTimeout(timer)
   }, [])
 
+  const handleExport = async () => {
+    setIsExporting(true)
+    toast({
+      title: "Generating Analytics Report",
+      description: "Please wait while we compile your performance data...",
+    })
+    
+    const success = await exportToPDF("performance-content", `${userData?.fullName || 'Student'}-Performance-Report.pdf`)
+    
+    setIsExporting(false)
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Your performance report has been downloaded.",
+      })
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "There was an error generating your PDF. Please try again.",
+      })
+    }
+  }
+
   if (isLoading) {
     return <PerformanceSkeleton />
   }
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
+    <div id="performance-content" className="min-h-screen bg-slate-50/50 pb-20 font-sans">
       <DashboardNavbar />
       
       <main className="container px-4 md:px-8 py-10 max-w-7xl mx-auto space-y-10">
@@ -77,8 +107,12 @@ export default function PerformancePage() {
             </p>
           </motion.div>
 
-          <Button className="h-14 px-8 rounded-2xl bg-white text-primary border-4 border-slate-100 font-black shadow-xl hover:bg-slate-50">
-            Export Report
+          <Button 
+            onClick={handleExport}
+            disabled={isExporting}
+            className="h-14 px-8 rounded-2xl bg-white text-primary border-4 border-slate-100 font-black shadow-xl hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isExporting ? "Generating..." : "Export Report"}
             <ArrowUpRight className="ml-2 h-5 w-5" />
           </Button>
         </section>

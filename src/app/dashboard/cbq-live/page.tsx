@@ -226,10 +226,20 @@ function LiveCBQContent() {
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  const handleAnswerSelect = (option: string) => {
+  const handleAnswerSelect = useCallback((option: string) => {
     if (isFinished) return
-    setSelectedAnswers({ ...selectedAnswers, [currentQuestion.id]: option })
-  }
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [currentQuestion.id]: option
+    }))
+    
+    // Smooth selection toast with micro-animation
+    toast({
+      title: "Selection Saved",
+      description: `You selected option: ${option}`,
+      duration: 1000,
+    })
+  }, [currentQuestion.id, isFinished, toast])
 
   const LeaderboardContent = () => (
     <div className="space-y-6">

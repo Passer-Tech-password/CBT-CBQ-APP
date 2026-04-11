@@ -2,49 +2,55 @@ import { jsPDF } from "jspdf"
 import html2canvas from "html2canvas"
 
 /**
- * Utility to export a DOM element as a PDF
+ * Utility to export a DOM element as a professional PDF result report
  * @param elementId The ID of the HTML element to export
  * @param fileName The name of the downloaded file
  */
-export const exportToPDF = async (elementId: string, fileName: string = "result-report.pdf") => {
+export const exportToPDF = async (elementId: string, fileName: string = "CBT-Result-Report.pdf") => {
   const element = document.getElementById(elementId)
   if (!element) return
 
   try {
+    // 1. Setup high-quality canvas
     const canvas = await html2canvas(element, {
-      scale: 2, // Higher quality
+      scale: 3, // Very high quality for professional look
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
+      windowWidth: 1200, // Fixed width for consistent layout
     })
 
-    const imgData = canvas.toDataURL("image/png")
+    const imgData = canvas.toDataURL("image/png", 1.0)
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
+      compress: true,
     })
 
-    const imgWidth = 210 // A4 width in mm
+    // A4 dimensions in mm
+    const pdfWidth = 210
+    const pdfHeight = 297
+
+    // Calculate image dimensions to fit A4 width
+    const imgWidth = pdfWidth
     const imgHeight = (canvas.height * imgWidth) / canvas.width
-    
-    // If the image is longer than one page, we could add multiple pages, 
-    // but for simple results, one long page or standard A4 usually suffices.
-    // For now, let's stick to standard A4 and scale accordingly or add pages if needed.
     
     let heightLeft = imgHeight
     let position = 0
 
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
-    heightLeft -= 297 // A4 height
+    // 2. Add content to PDF, handling multiple pages if needed
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, 'FAST')
+    heightLeft -= pdfHeight
 
     while (heightLeft >= 0) {
       position = heightLeft - imgHeight
       pdf.addPage()
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
-      heightLeft -= 297
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, 'FAST')
+      heightLeft -= pdfHeight
     }
 
+    // 3. Save the PDF
     pdf.save(fileName)
     return true
   } catch (error) {

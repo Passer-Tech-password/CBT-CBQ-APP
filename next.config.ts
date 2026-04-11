@@ -14,13 +14,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    // optimizePackageImports: ["lucide-react", "framer-motion"],
-  },
   // Production optimizations
   compiler: {
-    removeConsole: process.env.NODE_ENV === "production",
+    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },
+  poweredByHeader: false,
+  compress: true,
 };
 
 export default nextConfig;

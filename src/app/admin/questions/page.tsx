@@ -153,7 +153,8 @@ export default function QuestionsManagementPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="questions-container">
+      <div className="space-y-8">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -462,6 +463,6 @@ export default function QuestionsManagementPage() {
           </div>
         </Card>
       </div>
-    </>
+    </div>
   )
 }

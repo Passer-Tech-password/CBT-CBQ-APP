@@ -51,6 +51,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/components/ui/use-toast"
+import { exportToPDF } from "@/lib/pdf-export"
 import { cn } from "@/lib/utils"
 
 // Mock data for analytics
@@ -93,14 +95,34 @@ const METRICS = [
 export default function AdminAnalyticsPage() {
   const [timeRange, setTimeRange] = useState("30days")
   const [isExporting, setIsExporting] = useState(false)
+  const { toast } = useToast()
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true)
-    setTimeout(() => setIsExporting(false), 2000)
+    toast({
+      title: "Generating Analytics Report",
+      description: "Please wait while we compile the system performance data...",
+    })
+    
+    const success = await exportToPDF("admin-analytics-content", `CBT-System-Analytics-${new Date().toISOString().split('T')[0]}.pdf`)
+    
+    setIsExporting(false)
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "The system analytics report has been downloaded.",
+      })
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "There was an error generating the PDF. Please try again.",
+      })
+    }
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-10">
+    <div id="admin-analytics-content" className="space-y-10 animate-in fade-in duration-500 pb-10">
         {/* Header */}
         <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
