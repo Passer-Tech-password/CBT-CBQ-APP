@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 userDoc = await getDocFromCache(userDocRef)
               } catch (cacheErr: any) {
                 // If cache also fails, we'll throw and retry
-                throw err // Re-throw the original server error to trigger retry
+                throw cacheErr // Re-throw the cache error to preserve accurate error context
               }
             }
             
