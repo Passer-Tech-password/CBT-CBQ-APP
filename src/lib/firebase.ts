@@ -24,12 +24,22 @@ const app = getApps().length > 0
   ? getApp() 
   : initializeApp(isConfigValid ? firebaseConfig : { ...firebaseConfig, apiKey: "INVALID_KEY" });
 
-// Initialize Firestore with persistence
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
+// Initialize Firestore with optimized settings
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    }),
+    // Add long polling if needed for environments with proxy issues
+    // experimentalForceLongPolling: true 
+  });
+} catch (e) {
+  // If initialization fails (e.g. multiple tabs without proper manager), 
+  // fallback to standard getFirestore
+  db = getFirestore(app);
+  console.warn("Firestore initialization with persistence failed, falling back to standard initialization:", e);
+}
 
 const auth = getAuth(app);
 const storage = getStorage(app);
