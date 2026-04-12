@@ -6,6 +6,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
   getFirestore,
+  Firestore,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
@@ -24,7 +25,7 @@ const isConfigValid = !!(firebaseConfig.apiKey && firebaseConfig.apiKey.length >
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-let db;
+let db: Firestore;
 try {
   if (typeof window !== "undefined") {
     db = initializeFirestore(app, {

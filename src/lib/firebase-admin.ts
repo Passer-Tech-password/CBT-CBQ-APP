@@ -14,8 +14,10 @@ export function initAdmin() {
     }
 
     try {
+      console.log("Initializing Firebase Admin for project:", firebaseAdminConfig.projectId)
       return admin.initializeApp({
         credential: admin.credential.cert(firebaseAdminConfig),
+        projectId: firebaseAdminConfig.projectId, // Explicitly set projectId
       })
     } catch (error) {
       console.error("Firebase Admin initialization error", error)

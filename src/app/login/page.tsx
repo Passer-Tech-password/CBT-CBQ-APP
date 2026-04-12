@@ -61,7 +61,10 @@ export default function LoginPage() {
         body: JSON.stringify({ idToken }),
       })
 
-      if (!res.ok) throw new Error("Failed to initialize secure session")
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || "Failed to initialize secure session")
+      }
 
       const { role } = await res.json()
 

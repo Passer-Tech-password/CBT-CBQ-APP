@@ -45,8 +45,12 @@ export async function POST(request: NextRequest) {
     })
 
     return response
-  } catch (error) {
+  } catch (error: any) {
     console.error("Auth API Error:", error)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Return the actual error message to help debugging
+    return NextResponse.json(
+      { error: error.message || "Unauthorized" }, 
+      { status: error.code === 5 ? 404 : 401 }
+    )
   }
 }
