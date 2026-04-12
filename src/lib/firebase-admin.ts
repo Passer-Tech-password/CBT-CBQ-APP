@@ -8,8 +8,12 @@ const firebaseAdminConfig = {
 
 export function initAdmin() {
   if (!admin.apps.length) {
-    if (!firebaseAdminConfig.clientEmail || !firebaseAdminConfig.privateKey) {
-      console.warn("Firebase Admin credentials missing. Server-side validation will be disabled.")
+    if (!firebaseAdminConfig.clientEmail || !firebaseAdminConfig.privateKey || !firebaseAdminConfig.projectId) {
+      console.warn("Firebase Admin credentials missing. Current values:", {
+        projectId: !!firebaseAdminConfig.projectId,
+        clientEmail: !!firebaseAdminConfig.clientEmail,
+        privateKey: !!firebaseAdminConfig.privateKey,
+      })
       return null
     }
 

@@ -5,6 +5,7 @@ import { onAuthStateChanged, User } from "firebase/auth"
 import { doc, onSnapshot, Unsubscribe } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { LoadingScreen } from "./ui/loading-screen"
+import { useToast } from "./ui/use-toast"
 
 interface UserData {
   uid: string
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isOffline, setIsOffline] = useState(false)
   const [snapshotUnsub, setSnapshotUnsub] = useState<Unsubscribe | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     const authUnsub = onAuthStateChanged(auth, (firebaseUser) => {
@@ -86,6 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (msg.includes("insufficient permissions")) {
               console.warn("HELPFUL HINT: This usually means your Firestore Security Rules are blocking the read. Check your rules in the Firebase Console.")
+              toast({
+                variant: "destructive",
+                title: "Firestore Access Denied",
+                description: "Your Security Rules are blocking your account. Go to the Firebase Console -> Firestore -> Rules and allow authenticated reads.",
+              })
             }
 
             if (msg.includes("client is offline")) {
