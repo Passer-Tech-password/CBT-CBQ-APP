@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react"
 import { onAuthStateChanged, User } from "firebase/auth"
-import { doc, getDoc, getDocFromCache, getDocFromServer } from "firebase/firestore"
+import { doc, getDoc, getDocFromCache } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { LoadingScreen } from "./ui/loading-screen"
 
@@ -11,6 +11,8 @@ interface UserData {
   email: string | null
   fullName: string
   role: "student" | "admin"
+  isNewUser?: boolean
+  isOffline?: boolean
   [key: string]: any
 }
 
@@ -19,6 +21,7 @@ interface AuthContextType {
   userData: UserData | null
   loading: boolean
   isAdmin: boolean
+  isOffline?: boolean   // ← New: useful for UI feedback
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
   userData: null,
   loading: true,
   isAdmin: false,
+  isOffline: false,
 })
 
 export const useAuth = () => useContext(AuthContext)
@@ -34,116 +38,131 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isOffline, setIsOffline] = useState(false)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
-      
-      if (user) {
-        let attempts = 0
-        const maxAttempts = 5 // Increased attempts
-        const timeoutMs = 15000 // Increased timeout to 15 seconds for slow networks
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser)
+      setIsOffline(false)
 
-        const fetchUserData = async (currentAttempt: number) => {
-          try {
-            const userDocRef = doc(db, "users", user.uid)
-            
-            // First try to get from server with a short timeout
-            let userDoc;
-            try {
-              userDoc = await Promise.race([
-                getDoc(userDocRef),
-                new Promise<never>((_, reject) => 
-                  setTimeout(() => reject(new Error("Firestore fetch timeout")), timeoutMs)
-                )
-              ])
-            } catch (err: any) {
-              // If server fetch fails (timeout or offline), try cache
-              console.warn("Server fetch failed, trying cache:", err.message)
-              try {
-                userDoc = await getDocFromCache(userDocRef)
-              } catch (cacheErr: any) {
-                // If cache also fails, we'll throw and retry
-                throw cacheErr // Re-throw the cache error to preserve accurate error context
-              }
-            }
-            
-            if (userDoc && userDoc.exists()) {
-              const data = userDoc.data()
-              setUserData({
-                uid: user.uid,
-                email: user.email,
-                fullName: data.fullName || user.displayName || "User",
-                role: data.role || "student",
-                ...data
-              } as UserData)
-              return true
-            } else {
-              // Handle case where user exists in Auth but not in Firestore yet
-              console.warn("User document not found in Firestore. Creating fallback or retrying...")
-              if (currentAttempt === maxAttempts - 1) {
-                // Last attempt: provide a fallback so the app doesn't break
-                setUserData({
-                  uid: user.uid,
-                  email: user.email,
-                  fullName: user.displayName || "New User",
-                  role: "student",
-                  isNewUser: true
-                } as UserData)
-                return true
-              }
-              return false // Retry
-            }
-          } catch (error: any) {
-            const errorMessage = error.message || "Unknown error"
-            console.error(`Error fetching user data (Attempt ${currentAttempt + 1}/${maxAttempts}):`, errorMessage)
-            
-            if (currentAttempt === maxAttempts - 1) {
-              // Final attempt failed with an error: provide a fallback
-              console.warn("Final attempt failed with error. Applying fallback user data.")
-              setUserData({
-                uid: user.uid,
-                email: user.email,
-                fullName: user.displayName || "User (Offline)",
-                role: "student",
-                isOffline: true
-              } as UserData)
-              return true
-            }
-            
-            return false
-          }
-        }
-
-        while (attempts < maxAttempts) {
-          const success = await fetchUserData(attempts)
-          if (success) break
-          attempts++
-          if (attempts < maxAttempts) {
-            // Wait before retry with exponential backoff
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)))
-          }
-        }
-
-        if (attempts === maxAttempts && !userData) {
-          console.error("Max retry attempts reached for Firestore fetch.")
-          // Don't set to null if we already have a fallback
-        }
+      if (firebaseUser) {
+        await fetchUserDataWithRetry(firebaseUser)
       } else {
         setUserData(null)
       }
-      
+
       setLoading(false)
     })
 
     return () => unsubscribe()
   }, [])
 
+  const fetchUserDataWithRetry = async (firebaseUser: User) => {
+    const maxAttempts = 3
+    let lastError: any = null
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const userDocRef = doc(db, "users", firebaseUser.uid)
+
+        let userDoc
+
+        // First attempt: Try cache only (fastest)
+        if (attempt === 0) {
+          try {
+            userDoc = await getDocFromCache(userDocRef)
+          } catch (cacheErr: any) {
+            if (cacheErr.message?.includes("Failed to get document from cache")) {
+              // Cache miss → continue to normal getDoc
+              userDoc = null
+            } else {
+              throw cacheErr
+            }
+          }
+        }
+
+        // Default / subsequent attempts: Use normal getDoc (cache → server)
+        if (!userDoc) {
+          userDoc = await getDoc(userDocRef)
+        }
+
+        if (userDoc.exists()) {
+          const data = userDoc.data()
+
+          setUserData({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            fullName: data.fullName || firebaseUser.displayName || "User",
+            role: (data.role as "student" | "admin") || "student",
+            ...data,
+          } as UserData)
+
+          setIsOffline(false)
+          return // Success
+        } else {
+          // Document doesn't exist yet (common right after signup)
+          if (attempt === maxAttempts - 1) {
+            setUserData({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              fullName: firebaseUser.displayName || "New User",
+              role: "student",
+              isNewUser: true,
+            } as UserData)
+          }
+        }
+      } catch (error: any) {
+        lastError = error
+        const errorMsg = error.message || "Unknown error"
+
+        console.error(`Error fetching user data (Attempt ${attempt + 1}/${maxAttempts}):`, errorMsg)
+
+        // === Handle offline specifically ===
+        if (errorMsg.includes("Failed to get document because the client is offline")) {
+          console.warn("Client is offline → using fallback user data")
+          setIsOffline(true)
+
+          setUserData({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            fullName: firebaseUser.displayName || "User (Offline)",
+            role: "student",
+            isOffline: true,
+          } as UserData)
+
+          return // No need to retry when clearly offline
+        }
+
+        // For other errors, continue retrying (with backoff)
+      }
+
+      // Exponential backoff before next retry
+      if (attempt < maxAttempts - 1) {
+        const delay = 700 * Math.pow(1.6, attempt)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+
+    // If we reach here after all attempts and still no data
+    if (!userData) {
+      console.error("Max retry attempts reached for user data fetch.")
+      setUserData({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        fullName: firebaseUser.displayName || "User",
+        role: "student",
+        isOffline: true,
+      } as UserData)
+      setIsOffline(true)
+    }
+  }
+
   const value = {
     user,
     userData,
     loading,
     isAdmin: userData?.role === "admin",
+    isOffline: isOffline || userData?.isOffline === true,
   }
 
   return (
