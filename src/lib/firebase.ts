@@ -1,14 +1,14 @@
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+// @/lib/firebase.ts
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import {
-  getFirestore,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  type Firestore,
+  getFirestore,
 } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
+import { getStorage } from "firebase/storage";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.replace(/['"]/g, "").trim(),
@@ -20,66 +20,27 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.replace(/['"]/g, "").trim(),
 };
 
-// Validate config (prevent using placeholder values)
-const isConfigValid = !!(
-  firebaseConfig.apiKey &&
-  firebaseConfig.apiKey.length > 10 &&
-  firebaseConfig.projectId &&
-  firebaseConfig.projectId !== "your-project-id"
-);
+const isConfigValid = !!(firebaseConfig.apiKey && firebaseConfig.apiKey.length > 15 && firebaseConfig.projectId);
 
-let app: FirebaseApp;
-if (getApps().length > 0) {
-  app = getApp();
-} else {
-  app = initializeApp(isConfigValid ? firebaseConfig : { ...firebaseConfig, apiKey: "demo-key" });
-}
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with persistence (modern way)
-let db: Firestore;
-
+let db;
 try {
   if (typeof window !== "undefined") {
     db = initializeFirestore(app, {
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager(),
-        // You can add cache size limit if needed:
-        // cacheSizeBytes: 100 * 1024 * 1024, // 100 MB
       }),
     });
-
-    console.info("Firestore initialized with persistent local cache (multi-tab support)");
   } else {
-    // Server-side: use standard Firestore (no persistence needed)
     db = getFirestore(app);
   }
-} catch (error: any) {
-  console.warn("Failed to initialize Firestore with persistent cache. Falling back to default:", error.message);
-
-  // Fallback to basic getFirestore (no persistence)
+} catch (err) {
+  console.warn("Persistent cache failed to initialize. Using default Firestore.", err);
   db = getFirestore(app);
 }
 
-const auth: Auth = getAuth(app);
-const storage: FirebaseStorage = getStorage(app);
-
-// Analytics (client-side only)
-let analytics: Analytics | undefined = undefined;
-
-if (typeof window !== "undefined" && isConfigValid && firebaseConfig.measurementId) {
-  isSupported()
-    .then((supported) => {
-      if (supported) {
-        try {
-          analytics = getAnalytics(app);
-        } catch (err) {
-          console.warn("Firebase Analytics initialization failed:", err);
-        }
-      }
-    })
-    .catch((err) => {
-      console.warn("Analytics isSupported() check failed:", err);
-    });
-}
-
-export { app, auth, db, storage, analytics, isConfigValid };
+export const auth = getAuth(app);
+export const storage = getStorage(app);
+export { db };
+export { isConfigValid };
