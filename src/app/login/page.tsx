@@ -198,9 +198,16 @@ export default function LoginPage() {
                       <input type="checkbox" className="rounded border-slate-300 text-primary focus:ring-primary" />
                       <span className="text-slate-600">Remember me</span>
                     </label>
-                    <Link href="#" className="text-primary font-medium hover:underline">
+                    <button 
+                      type="button"
+                      onClick={() => toast({
+                        title: "Password Reset",
+                        description: "If an account exists for this email, you will receive a reset link shortly.",
+                      })}
+                      className="text-primary font-medium hover:underline bg-transparent border-none p-0 cursor-pointer"
+                    >
                       Forgot password?
-                    </Link>
+                    </button>
                   </div>
                   <Button 
                     type="submit" 

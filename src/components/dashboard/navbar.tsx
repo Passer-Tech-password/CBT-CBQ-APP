@@ -17,11 +17,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth-provider"
+import { useToast } from "@/components/ui/use-toast"
 
 export function DashboardNavbar() {
   const router = useRouter()
   const { user, userData } = useAuth()
   const { isOnline, isSyncing, syncPendingResults } = useOfflineSync()
+  const { toast } = useToast()
 
   const handleSignOut = async () => {
     try {
@@ -75,7 +77,15 @@ export function DashboardNavbar() {
             <p className="text-[10px] font-medium text-white/60 uppercase tracking-widest mt-1">Student Account</p>
           </div>
 
-          <Button variant="ghost" size="icon" className="relative text-white hover:bg-white/10 h-11 w-11 rounded-xl">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => toast({
+              title: "Notifications",
+              description: "You have no new messages at this time.",
+            })}
+            className="relative text-white hover:bg-white/10 h-11 w-11 rounded-xl"
+          >
             <Bell className="h-6 w-6" />
             <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-primary"></span>
           </Button>
@@ -99,9 +109,9 @@ export function DashboardNavbar() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/profile")}>
+              <DropdownMenuItem onClick={() => router.push("/dashboard/profile")}>
                 <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <span>Profile Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">

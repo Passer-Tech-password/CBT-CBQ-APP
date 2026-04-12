@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 const subjects = [
   {
@@ -80,11 +81,18 @@ const subjects = [
 ]
 
 export function SubjectGrid() {
+  const router = useRouter()
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Available Subjects</h2>
-        <Button variant="ghost" size="sm" className="text-primary font-bold flex items-center hover:bg-primary/5">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => router.push("/dashboard/mode-selection")}
+          className="text-primary font-bold flex items-center hover:bg-primary/5"
+        >
           View all <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
@@ -97,34 +105,33 @@ export function SubjectGrid() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: idx * 0.05 }}
             whileHover={{ y: -8 }}
+            onClick={() => router.push(`/dashboard/mode-selection?subject=${subject.name}`)}
             className="group cursor-pointer"
           >
-            <Card className="h-full border-none shadow-xl shadow-slate-200/50 group-hover:shadow-2xl transition-all overflow-hidden flex flex-col">
-              <div className={`h-1.5 w-full ${subject.color}`} />
-              <CardHeader className="pb-2 pt-6">
-                <div className={`w-14 h-14 rounded-2xl ${subject.lightColor} flex items-center justify-center transition-transform group-hover:rotate-6 shadow-inner`}>
+            <Card className="h-full border-none shadow-xl shadow-slate-200/50 bg-white rounded-[2rem] overflow-hidden transition-all group-hover:shadow-2xl group-hover:shadow-primary/10">
+              <CardHeader className="p-8 pb-4">
+                <div className={`${subject.lightColor} w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-inner`}>
                   <subject.icon className={`h-7 w-7 ${subject.textColor}`} />
                 </div>
+                <CardTitle className="text-2xl font-black text-slate-900 leading-none mb-2">{subject.name}</CardTitle>
+                <CardDescription className="text-slate-500 font-bold text-sm leading-relaxed">{subject.description}</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 pb-4">
-                <CardTitle className="text-xl font-black text-slate-900 mb-2 group-hover:text-primary transition-colors">
-                  {subject.name}
-                </CardTitle>
-                <CardDescription className="text-sm font-medium text-slate-500 line-clamp-2 leading-relaxed">
-                  {subject.description}
-                </CardDescription>
-                <div className="mt-4 flex items-center space-x-4 text-xs font-black text-slate-400 uppercase tracking-widest">
-                  <span className="flex items-center">
-                    {subject.questions} Qs
-                  </span>
-                  <span className="flex items-center">
-                    {subject.tests} Tests
-                  </span>
+              <CardContent className="p-8 pt-0">
+                <div className="flex items-center space-x-6">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Questions</span>
+                    <span className="text-lg font-black text-slate-900">{subject.questions}</span>
+                  </div>
+                  <div className="h-8 w-px bg-slate-100" />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Tests</span>
+                    <span className="text-lg font-black text-slate-900">{subject.tests}</span>
+                  </div>
                 </div>
               </CardContent>
-              <CardFooter className="pt-0 pb-6 px-6">
-                <Button className="w-full bg-slate-50 text-slate-900 border-2 border-slate-100 font-bold hover:bg-primary hover:text-white hover:border-primary transition-all group-hover:shadow-lg rounded-xl">
-                  Start Practice
+              <CardFooter className="p-8 pt-0">
+                <Button className={`w-full ${subject.color} hover:opacity-90 text-white font-black rounded-xl h-12 shadow-lg transition-all flex items-center justify-center group-hover:translate-y-[-2px]`}>
+                  Take Test
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>

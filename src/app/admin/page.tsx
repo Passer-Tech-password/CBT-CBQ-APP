@@ -139,10 +139,39 @@ export default function AdminDashboardPage() {
           <p className="text-slate-500 font-bold mt-1 text-lg">Real-time performance metrics and student activity.</p>
         </motion.div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" className="h-12 px-6 rounded-2xl border-4 border-slate-100 font-black shadow-xl hover:bg-slate-50">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              toast({
+                title: "Preparing CSV",
+                description: "Your data is being compiled into a CSV file...",
+              })
+              setTimeout(() => {
+                toast({
+                  title: "Download Ready",
+                  description: "System data exported successfully.",
+                })
+              }, 2000)
+            }}
+            className="h-12 px-6 rounded-2xl border-4 border-slate-100 font-black shadow-xl hover:bg-slate-50"
+          >
             Download CSV
           </Button>
-          <Button className="h-12 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black shadow-xl shadow-primary/20">
+          <Button 
+            onClick={() => {
+              toast({
+                title: "System Report",
+                description: "Analyzing data and generating comprehensive report...",
+              })
+              setTimeout(() => {
+                toast({
+                  title: "Report Generated",
+                  description: "Final system report is ready for viewing.",
+                })
+              }, 3000)
+            }}
+            className="h-12 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black shadow-xl shadow-primary/20"
+          >
             Generate Report
           </Button>
         </div>

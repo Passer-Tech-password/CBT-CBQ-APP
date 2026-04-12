@@ -108,7 +108,10 @@ export default function DashboardPage() {
                 <CardDescription className="text-blue-100 text-base mb-6 font-medium">
                   Compete with students across the country in real-time. Starts in 2 hours!
                 </CardDescription>
-                <Button className="bg-white text-primary hover:bg-blue-50 font-bold px-8 h-11 rounded-xl transition-all hover:scale-105 group">
+                <Button 
+                  onClick={() => router.push("/dashboard/cbq-live?subject=Mathematics")}
+                  className="bg-white text-primary hover:bg-blue-50 font-bold px-8 h-11 rounded-xl transition-all hover:scale-105 group"
+                >
                   Register Now
                   <Trophy className="ml-2 h-4 w-4 text-accent transition-transform group-hover:rotate-12" />
                 </Button>
