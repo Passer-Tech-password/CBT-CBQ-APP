@@ -26,7 +26,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { useOfflineSync } from "@/hooks/use-offline-sync"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -57,7 +56,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
-      <DashboardNavbar />
       
       <main className="container px-4 md:px-8 py-10 max-w-4xl mx-auto space-y-10">
         {/* Profile Header */}

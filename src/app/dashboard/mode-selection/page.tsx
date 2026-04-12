@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { cn } from "@/lib/utils"
 
 function ModeSelectionContent() {
@@ -66,7 +65,6 @@ function ModeSelectionContent() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-12">
-      <DashboardNavbar />
       
       <main className="container px-4 md:px-8 py-8">
         <Button 

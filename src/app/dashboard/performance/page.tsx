@@ -18,7 +18,6 @@ import {
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { PerformanceSkeleton } from "@/components/dashboard/performance-skeleton"
 import { cn } from "@/lib/utils"
 import { exportToPDF } from "@/lib/pdf-export"
@@ -86,7 +85,6 @@ export default function PerformancePage() {
   }
   return (
     <div id="performance-content" className="min-h-screen bg-slate-50/50 pb-20 font-sans">
-      <DashboardNavbar />
       
       <main className="container px-4 md:px-8 py-10 max-w-7xl mx-auto space-y-10">
         {/* Page Header */}

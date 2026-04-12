@@ -28,7 +28,6 @@ import {
   AccordionItem, 
   AccordionTrigger 
 } from "@/components/ui/accordion"
-import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { cn } from "@/lib/utils"
 import { exportToPDF } from "@/lib/pdf-export"
 import { ResultReport } from "@/components/dashboard/result-report"
@@ -185,14 +184,13 @@ function ResultsContent() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
-      <DashboardNavbar />
       
       {/* Hidden PDF Content - Optimized for Export */}
       <div className="fixed left-[-9999px] top-0">
         <ResultReport data={result} subject={subject} />
       </div>
 
-      <main className="container px-4 md:px-8 py-10 max-w-6xl mx-auto space-y-10">
+      <main className="container px-4 md:px-8 py-10 max-w-5xl mx-auto space-y-10">
         {/* Header Section with Score and Trophy */}
         <section className="text-center space-y-6">
           <motion.div
