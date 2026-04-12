@@ -84,6 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const msg = error.message || ""
             console.error("onSnapshot error:", msg)
 
+            if (msg.includes("insufficient permissions")) {
+              console.warn("HELPFUL HINT: This usually means your Firestore Security Rules are blocking the read. Check your rules in the Firebase Console.")
+            }
+
             if (msg.includes("client is offline")) {
               setIsOffline(true)
               setUserData({
