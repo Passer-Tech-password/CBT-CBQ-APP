@@ -54,48 +54,145 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { exportToPDF } from "@/lib/pdf-export"
 import { cn } from "@/lib/utils"
+import { db } from "@/lib/firebase"
+import { collection, query, orderBy, limit, onSnapshot, getDocs } from "firebase/firestore"
 
-// Mock data for analytics
-const PERFORMANCE_TREND = [
-  { date: "Mar 01", avgScore: 65, tests: 45 },
-  { date: "Mar 05", avgScore: 72, tests: 62 },
-  { date: "Mar 10", avgScore: 68, tests: 58 },
-  { date: "Mar 15", avgScore: 78, tests: 85 },
-  { date: "Mar 20", avgScore: 75, tests: 72 },
-  { date: "Mar 25", avgScore: 82, tests: 94 },
-  { date: "Mar 30", avgScore: 85, tests: 110 },
-]
-
-const SUBJECT_PERFORMANCE = [
-  { subject: "Mathematics", avgScore: 88, color: "#1E3A8A" },
-  { subject: "Biology", avgScore: 75, color: "#10B981" },
-  { subject: "Physics", avgScore: 62, color: "#8B5CF6" },
-  { subject: "Chemistry", avgScore: 68, color: "#F59E0B" },
-  { subject: "English", avgScore: 92, color: "#EC4899" },
-]
-
-const PASS_FAIL_DATA = [
-  { name: "Pass (>=50%)", value: 780, color: "#10B981" },
-  { name: "Fail (<50%)", value: 220, color: "#EF4444" },
-]
-
-const TOP_PERFORMERS = [
-  { id: "1", name: "Alice Johnson", tests: 12, avgScore: 95, avatar: "Alice" },
-  { id: "2", name: "Charlie Brown", tests: 15, avgScore: 92, avatar: "Charlie" },
-  { id: "3", name: "Diana Prince", tests: 8, avgScore: 88, avatar: "Diana" },
-]
-
-const METRICS = [
-  { label: "Total Tests Taken", value: "2,450", trend: "+12.5%", isPositive: true, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
-  { label: "Most Active Subject", value: "Math", trend: "High", isPositive: true, icon: Zap, color: "text-amber-600", bg: "bg-amber-50" },
-  { label: "Completion Rate", value: "94.2%", trend: "+2.1%", isPositive: true, icon: Activity, color: "text-emerald-600", bg: "bg-emerald-50" },
-  { label: "Active Students", value: "1,120", trend: "-5.4%", isPositive: false, icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
+// Constants for UI
+const METRIC_CONFIG = [
+  { label: "Total Tests Taken", key: "totalTests", icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
+  { label: "Most Active Subject", key: "activeSubject", icon: Zap, color: "text-amber-600", bg: "bg-amber-50" },
+  { label: "Average Pass Rate", key: "passRateDisplay", icon: Target, color: "text-emerald-600", bg: "bg-emerald-50" },
+  { label: "Active Students", key: "activeStudents", icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
 ]
 
 export default function AdminAnalyticsPage() {
   const [timeRange, setTimeRange] = useState("30days")
   const [isExporting, setIsExporting] = useState(false)
+  const [liveResults, setLiveResults] = useState<any[]>([])
+  const [metrics, setMetrics] = useState<any>({
+    totalTests: "0",
+    activeSubject: "N/A",
+    passRateDisplay: "0%",
+    activeStudents: "0",
+    passRate: 0
+  })
+  const [topPerformers, setTopPerformers] = useState<any[]>([])
+  const [performanceTrend, setPerformanceTrend] = useState<any[]>([])
+  const [passFailData, setPassFailData] = useState<any[]>([
+    { name: "Pass (>=50%)", value: 0, color: "#10B981" },
+    { name: "Fail (<50%)", value: 0, color: "#EF4444" },
+  ])
   const { toast } = useToast()
+
+  useEffect(() => {
+    // 1. Live Scoreboard Listener
+    const qLive = query(
+      collection(db, "results"),
+      orderBy("completedAt", "desc"),
+      limit(10)
+    )
+
+    const unsubscribeLive = onSnapshot(qLive, (snapshot) => {
+      const results = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setLiveResults(results)
+    })
+
+    // 2. Fetch all results for aggregate metrics
+    const fetchMetrics = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "results"))
+        const allResults = querySnapshot.docs.map(doc => doc.data())
+        
+        if (allResults.length === 0) return
+
+        // Calculate Metrics
+        const totalTests = allResults.length
+        const students = new Set(allResults.map(r => r.uid)).size
+        
+        const subjectCounts: Record<string, number> = {}
+        let passes = 0
+        let fails = 0
+
+        // Performance Trend calculation (last 7 days)
+        const dailyStats: Record<string, { total: number, count: number }> = {}
+        const now = new Date()
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now)
+          d.setDate(d.getDate() - i)
+          dailyStats[d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })] = { total: 0, count: 0 }
+        }
+
+        allResults.forEach(r => {
+          // Subject activity
+          subjectCounts[r.subject] = (subjectCounts[r.subject] || 0) + 1
+          
+          // Pass/Fail
+          if (r.score >= 50) passes++
+          else fails++
+
+          // Daily stats
+          const dateStr = new Date(r.completedAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+          if (dailyStats[dateStr]) {
+            dailyStats[dateStr].total += r.score
+            dailyStats[dateStr].count += 1
+          }
+        })
+
+        const activeSubject = Object.entries(subjectCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A"
+        const passRate = totalTests > 0 ? Math.round((passes / totalTests) * 100) : 0
+        
+        setMetrics({
+          totalTests: totalTests.toLocaleString(),
+          activeSubject,
+          passRateDisplay: `${passRate}%`,
+          activeStudents: students.toLocaleString(),
+          passRate
+        })
+
+        setPassFailData([
+          { name: "Pass (>=50%)", value: passes, color: "#10B981" },
+          { name: "Fail (<50%)", value: fails, color: "#EF4444" },
+        ])
+
+        setPerformanceTrend(Object.entries(dailyStats).map(([date, stats]) => ({
+          date,
+          avgScore: stats.count > 0 ? Math.round(stats.total / stats.count) : 0
+        })))
+
+        // Calculate Top Performers
+        const studentStats: Record<string, { name: string, tests: number, totalScore: number }> = {}
+        allResults.forEach(r => {
+          if (!studentStats[r.uid]) {
+            studentStats[r.uid] = { name: r.studentName || "Anonymous", tests: 0, totalScore: 0 }
+          }
+          studentStats[r.uid].tests += 1
+          studentStats[r.uid].totalScore += r.score
+        })
+
+        const performers = Object.entries(studentStats)
+          .map(([id, stats]) => ({
+            id,
+            name: stats.name,
+            tests: stats.tests,
+            avgScore: Math.round(stats.totalScore / stats.tests),
+            avatar: stats.name
+          }))
+          .sort((a, b) => b.avgScore - a.avgScore)
+          .slice(0, 5)
+
+        setTopPerformers(performers)
+      } catch (error) {
+        console.error("Error fetching metrics:", error)
+      }
+    }
+
+    fetchMetrics()
+
+    return () => unsubscribeLive()
+  }, [])
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -157,7 +254,7 @@ export default function AdminAnalyticsPage() {
 
         {/* Metric Cards */}
         <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          {METRICS.map((metric, idx) => (
+          {METRIC_CONFIG.map((metric, idx) => (
             <motion.div
               key={metric.label}
               initial={{ opacity: 0, y: 20 }}
@@ -172,13 +269,13 @@ export default function AdminAnalyticsPage() {
                   </div>
                   <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{metric.label}</p>
                   <div className="flex items-end justify-between">
-                    <div className="text-4xl font-black text-slate-900 tracking-tighter">{metric.value}</div>
+                    <div className="text-4xl font-black text-slate-900 tracking-tighter">{metrics[metric.key]}</div>
                     <div className={cn(
                       "flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm",
-                      metric.isPositive ? "bg-emerald-50 text-accent border-emerald-100" : "bg-red-50 text-red-500 border-red-100"
+                      "bg-emerald-50 text-accent border-emerald-100"
                     )}>
-                      {metric.isPositive ? <ArrowUpRight className="mr-1 h-3 w-3" /> : <ArrowDownRight className="mr-1 h-3 w-3" />}
-                      {metric.trend}
+                      <ArrowUpRight className="mr-1 h-3 w-3" />
+                      Live
                     </div>
                   </div>
                 </div>
@@ -203,7 +300,7 @@ export default function AdminAnalyticsPage() {
             </div>
             <div className="flex-1 h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={PERFORMANCE_TREND}>
+                <AreaChart data={performanceTrend}>
                   <defs>
                     <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#1E3A8A" stopOpacity={0.1}/>
@@ -255,7 +352,7 @@ export default function AdminAnalyticsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={PASS_FAIL_DATA}
+                      data={passFailData}
                       cx="50%"
                       cy="50%"
                       innerRadius={80}
@@ -264,7 +361,7 @@ export default function AdminAnalyticsPage() {
                       dataKey="value"
                       stroke="none"
                     >
-                      {PASS_FAIL_DATA.map((entry, index) => (
+                      {passFailData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -274,12 +371,12 @@ export default function AdminAnalyticsPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <div className="text-4xl font-black text-slate-900">78%</div>
+                  <div className="text-4xl font-black text-slate-900">{metrics.passRate}%</div>
                   <div className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Pass Rate</div>
                 </div>
               </div>
               <div className="w-full space-y-4 mt-8">
-                {PASS_FAIL_DATA.map((item) => (
+                {passFailData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 shadow-sm">
                     <div className="flex items-center">
                       <div className="h-4 w-4 rounded-full mr-3 shadow-sm" style={{ backgroundColor: item.color }} />
@@ -292,40 +389,60 @@ export default function AdminAnalyticsPage() {
             </div>
           </Card>
 
-          {/* Subject Performance Bar Chart */}
+          {/* Live Scoreboard */}
           <Card className="lg:col-span-2 border-none shadow-2xl shadow-slate-200/50 bg-white rounded-[2.5rem] p-10">
-            <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <CardTitle className="text-2xl font-black text-slate-900">Performance by Subject</CardTitle>
-                <CardDescription className="text-slate-500 font-bold mt-1 text-lg">Average scores across core subjects</CardDescription>
+                <CardTitle className="text-2xl font-black text-slate-900">Live Scoreboard</CardTitle>
+                <CardDescription className="text-slate-500 font-bold mt-1 text-lg">Real-time test submissions.</CardDescription>
               </div>
-              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border-2 border-slate-100">
-                <MoreVertical className="h-6 w-6 text-slate-400" />
-              </Button>
+              <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
             </div>
-            <div className="h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={SUBJECT_PERFORMANCE} layout="vertical">
-                  <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="subject" 
-                    type="category" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    width={120}
-                    tick={{ fill: '#1e293b', fontSize: 14, fontWeight: 900 }} 
-                  />
-                  <Tooltip 
-                    cursor={{ fill: '#f8fafc', radius: 12 }}
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)', padding: '1.2rem' }}
-                  />
-                  <Bar dataKey="avgScore" radius={[0, 15, 15, 0]} barSize={36}>
-                    {SUBJECT_PERFORMANCE.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left pb-4 font-black text-slate-400 uppercase tracking-widest text-xs">Student</th>
+                    <th className="text-left pb-4 font-black text-slate-400 uppercase tracking-widest text-xs">Subject</th>
+                    <th className="text-center pb-4 font-black text-slate-400 uppercase tracking-widest text-xs">Score</th>
+                    <th className="text-right pb-4 font-black text-slate-400 uppercase tracking-widest text-xs">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {liveResults.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-400 font-bold">No recent results found.</td>
+                    </tr>
+                  ) : (
+                    liveResults.map((result) => (
+                      <tr key={result.id} className="group">
+                        <td className="py-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-500 text-xs">
+                              {result.studentName?.charAt(0) || "S"}
+                            </div>
+                            <span className="font-bold text-slate-900">{result.studentName || "Anonymous"}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 font-bold text-slate-500">{result.subject}</td>
+                        <td className="py-4 text-center">
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-xs font-black",
+                            result.score >= 70 ? "bg-emerald-100 text-emerald-600" :
+                            result.score >= 50 ? "bg-amber-100 text-amber-600" :
+                            "bg-rose-100 text-rose-600"
+                          )}>
+                            {Math.round(result.score)}%
+                          </span>
+                        </td>
+                        <td className="py-4 text-right text-slate-400 font-bold text-xs">
+                          {result.completedAt ? new Date(result.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </Card>
 
@@ -341,25 +458,29 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
             <div className="flex-1 space-y-6">
-              {TOP_PERFORMERS.map((student, idx) => (
-                <div key={student.id} className="flex items-center justify-between p-5 rounded-[2rem] bg-white border-2 border-slate-50 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 group">
-                  <div className="flex items-center space-x-5">
-                    <div className={cn(
-                      "h-10 w-10 rounded-xl flex items-center justify-center font-black text-sm shadow-inner transition-transform group-hover:rotate-6",
-                      idx === 0 ? "bg-amber-100 text-amber-600" : idx === 1 ? "bg-slate-100 text-slate-500" : "bg-orange-100 text-orange-600"
-                    )}>
-                      #{idx + 1}
+              {topPerformers.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 font-bold">No performance data yet.</div>
+              ) : (
+                topPerformers.map((student, idx) => (
+                  <div key={student.id} className="flex items-center justify-between p-5 rounded-[2rem] bg-white border-2 border-slate-50 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 group">
+                    <div className="flex items-center space-x-5">
+                      <div className={cn(
+                        "h-10 w-10 rounded-xl flex items-center justify-center font-black text-sm shadow-inner transition-transform group-hover:rotate-6",
+                        idx === 0 ? "bg-amber-100 text-amber-600" : idx === 1 ? "bg-slate-100 text-slate-500" : "bg-orange-100 text-orange-600"
+                      )}>
+                        #{idx + 1}
+                      </div>
+                      <div>
+                        <div className="font-black text-slate-900 text-lg">{student.name}</div>
+                        <div className="text-slate-400 font-bold text-sm uppercase tracking-widest mt-0.5">{student.tests} Tests Taken</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-black text-slate-900 text-lg">{student.name}</div>
-                      <div className="text-slate-400 font-bold text-sm uppercase tracking-widest mt-0.5">{student.tests} Tests Taken</div>
+                    <div className="text-right">
+                      <div className="text-2xl font-black text-primary">{student.avgScore}%</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-black text-primary">{student.avgScore}%</div>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
               <Button variant="ghost" className="w-full h-14 rounded-2xl font-black text-slate-400 hover:text-primary hover:bg-primary/5 transition-all mt-4 border-2 border-dashed border-slate-200">
                 View Full Leaderboard
               </Button>

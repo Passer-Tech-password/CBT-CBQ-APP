@@ -19,7 +19,7 @@ import {
   ShieldCheck,
   AlertTriangle
 } from "lucide-react"
-import { doc, setDoc, collection, addDoc, updateDoc, increment } from "firebase/firestore"
+import { doc, setDoc, collection, addDoc, updateDoc, increment, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -28,44 +28,7 @@ import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
-// Mock questions
-const MOCK_QUESTIONS = [
-  {
-    id: 1,
-    question: "What is the result of 15 x 8?",
-    options: ["100", "110", "120", "130"],
-    correctAnswer: "120",
-    explanation: "15 multiplied by 8 equals 120."
-  },
-  {
-    id: 2,
-    question: "Solve for x: 2x + 10 = 30",
-    options: ["5", "10", "15", "20"],
-    correctAnswer: "10",
-    explanation: "Subtract 10 from both sides: 2x = 20. Divide by 2: x = 10."
-  },
-  {
-    id: 3,
-    question: "What is the square root of 144?",
-    options: ["10", "11", "12", "14"],
-    correctAnswer: "12",
-    explanation: "12 x 12 = 144."
-  },
-  {
-    id: 4,
-    question: "If a triangle has angles 60° and 90°, what is the third angle?",
-    options: ["30°", "45°", "60°", "90°"],
-    correctAnswer: "30°",
-    explanation: "The sum of angles in a triangle is 180°. 180 - 60 - 90 = 30."
-  },
-  {
-    id: 5,
-    question: "What is the value of Pi (π) rounded to two decimal places?",
-    options: ["3.12", "3.14", "3.16", "3.18"],
-    correctAnswer: "3.14",
-    explanation: "Pi is approximately 3.14159..."
-  }
-]
+import { Loader2 } from "lucide-react"
 
 function QuizContent() {
   const router = useRouter()
@@ -73,10 +36,12 @@ function QuizContent() {
   const mode = searchParams.get("mode") || "practice"
   const subject = searchParams.get("subject") || "Mathematics"
   
+  const [questions, setQuestions] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({})
   const [startTime] = useState(Date.now())
-  const [endTime] = useState(Date.now() + 600 * 1000) // 10 minutes from start
+  const [endTime, setEndTime] = useState(Date.now() + 600 * 1000) // 10 minutes from start
   const [timeLeft, setTimeLeft] = useState(600)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
@@ -84,44 +49,96 @@ function QuizContent() {
   const [cheatWarnings, setCheatWarnings] = useState(0)
   const { toast } = useToast()
 
-  const currentQuestion = MOCK_QUESTIONS[currentQuestionIdx]
-  const progress = ((currentQuestionIdx + 1) / MOCK_QUESTIONS.length) * 100
+  const { user, userData } = useAuth()
 
-  const { user } = useAuth()
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      setIsLoading(true)
+      try {
+        const q = query(
+          collection(db, "questions"),
+          where("subject", "==", subject)
+        )
+        const querySnapshot = await getDocs(q)
+        const questionsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        
+        if (questionsData.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "No Questions Found",
+            description: `We couldn't find any questions for ${subject}. Please try another subject.`,
+          })
+          router.push("/dashboard/mode-selection")
+          return
+        }
+
+        setQuestions(questionsData)
+        
+        // Calculate total time based on question time limits
+        const totalTime = questionsData.reduce((acc, q: any) => acc + (q.timeLimit || 60), 0)
+        setTimeLeft(totalTime)
+        setEndTime(Date.now() + totalTime * 1000)
+      } catch (error) {
+        console.error("Error fetching questions:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load questions. Please try again.",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchQuestions()
+  }, [subject, toast, router])
+
+  const currentQuestion = questions[currentQuestionIdx]
+  const progress = questions.length > 0 ? ((currentQuestionIdx + 1) / questions.length) * 100 : 0
 
   const handleFinish = useCallback(async () => {
-    if (isSubmitting || isFinished) return
+    if (isSubmitting || isFinished || questions.length === 0) return
     setIsSubmitting(true)
     
-    const score = MOCK_QUESTIONS.reduce((acc, q) => 
-      selectedAnswers[q.id] === q.correctAnswer ? acc + 1 : acc, 0
-    )
-    const percentage = (score / MOCK_QUESTIONS.length) * 100
+    let score = 0
+    questions.forEach(q => {
+      const userAnswer = selectedAnswers[q.id]
+      const correctOption = q.options.find((o: any) => o.isCorrect)
+      if (userAnswer === correctOption?.text) {
+        score++
+      }
+    })
+    
+    const percentage = Math.round((score / questions.length) * 100)
 
     try {
       if (user) {
         // Save result to Firestore
         const resultData = {
           uid: user.uid,
+          studentName: userData?.fullName || "Anonymous Student",
           subject,
           mode,
           score: percentage,
           correctAnswers: score,
-          totalQuestions: MOCK_QUESTIONS.length,
-          timeTaken: formatTime(600 - timeLeft),
+          totalQuestions: questions.length,
+          timeTaken: formatTime((questions.reduce((acc, q: any) => acc + (q.timeLimit || 60), 0)) - timeLeft),
           completedAt: new Date().toISOString(),
-          accuracy: Math.round((score / MOCK_QUESTIONS.length) * 100),
-          questions: MOCK_QUESTIONS.map(q => ({
+          accuracy: percentage,
+          questions: questions.map(q => ({
             id: q.id,
             question: q.question,
             userAnswer: selectedAnswers[q.id] || "No Answer",
-            correctAnswer: q.correctAnswer,
-            isCorrect: selectedAnswers[q.id] === q.correctAnswer,
+            correctAnswer: q.options.find((o: any) => o.isCorrect)?.text || "N/A",
+            isCorrect: selectedAnswers[q.id] === q.options.find((o: any) => o.isCorrect)?.text,
             explanation: q.explanation
           }))
         }
 
-        const resultRef = await addDoc(collection(db, "results"), resultData)
+        await addDoc(collection(db, "results"), resultData)
         
         // Update user stats
         const userRef = doc(db, "users", user.uid)
@@ -155,11 +172,11 @@ function QuizContent() {
         })
       }
     }
-  }, [isSubmitting, isFinished, toast, selectedAnswers, subject, mode, user, timeLeft])
+  }, [isSubmitting, isFinished, toast, selectedAnswers, subject, mode, user, timeLeft, questions, userData])
 
   // Improved Timer logic
   useEffect(() => {
-    if (mode === "practice" || isFinished) return
+    if (mode === "practice" || isFinished || questions.length === 0) return
 
     const timer = setInterval(() => {
       const now = Date.now()
@@ -174,24 +191,24 @@ function QuizContent() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [mode, isFinished, handleFinish, endTime])
+  }, [mode, isFinished, handleFinish, endTime, questions.length])
 
   // Keyboard Navigation
   useEffect(() => {
-    if (isFinished && !isReviewing) return
+    if ((isFinished && !isReviewing) || !currentQuestion) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Numbers 1-4 for options
       if (['1', '2', '3', '4'].includes(e.key)) {
         const idx = parseInt(e.key) - 1
         if (currentQuestion.options[idx]) {
-          handleAnswerSelect(currentQuestion.options[idx])
+          handleAnswerSelect(currentQuestion.options[idx].text)
         }
       }
       
       // Arrow keys for navigation
       if (e.key === 'ArrowRight' || e.key === 'Enter') {
-        if (currentQuestionIdx < MOCK_QUESTIONS.length - 1) {
+        if (currentQuestionIdx < questions.length - 1) {
           nextQuestion()
         } else if (e.key === 'Enter' && !isReviewing) {
           handleFinish()
@@ -204,11 +221,11 @@ function QuizContent() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentQuestionIdx, currentQuestion, isFinished, isReviewing])
+  }, [currentQuestionIdx, currentQuestion, isFinished, isReviewing, questions.length])
 
   // Anti-cheat: Detect tab switching and window blur
   useEffect(() => {
-    if (isFinished || mode === "practice") return
+    if (isFinished || mode === "practice" || questions.length === 0) return
 
     const handleViolation = () => {
       setCheatWarnings(prev => {
@@ -248,7 +265,7 @@ function QuizContent() {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("blur", handleBlur)
     }
-  }, [isFinished, mode, handleFinish, toast])
+  }, [isFinished, mode, handleFinish, toast, questions.length])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -256,16 +273,16 @@ function QuizContent() {
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  const handleAnswerSelect = (option: string) => {
+  const handleAnswerSelect = (optionText: string) => {
     if (isFinished && !isReviewing) return
     setSelectedAnswers({
       ...selectedAnswers,
-      [currentQuestion.id]: option
+      [currentQuestion.id]: optionText
     })
   }
 
   const nextQuestion = () => {
-    if (currentQuestionIdx < MOCK_QUESTIONS.length - 1) {
+    if (currentQuestionIdx < questions.length - 1) {
       setCurrentQuestionIdx(currentQuestionIdx + 1)
     } else if (!isReviewing) {
       handleFinish()
@@ -278,11 +295,25 @@ function QuizContent() {
     }
   }
 
-  if (isFinished && !isReviewing) {
-    const score = MOCK_QUESTIONS.reduce((acc, q) => 
-      selectedAnswers[q.id] === q.correctAnswer ? acc + 1 : acc, 0
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-slate-500 font-bold">Loading questions for {subject}...</p>
+      </div>
     )
-    const percentage = (score / MOCK_QUESTIONS.length) * 100
+  }
+
+  if (isFinished && !isReviewing) {
+    let score = 0
+    questions.forEach(q => {
+      const userAnswer = selectedAnswers[q.id]
+      const correctOption = q.options.find((o: any) => o.isCorrect)
+      if (userAnswer === correctOption?.text) {
+        score++
+      }
+    })
+    const percentage = Math.round((score / questions.length) * 100)
     
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -314,7 +345,7 @@ function QuizContent() {
                 </div>
                 <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Questions</p>
-                  <p className="text-3xl font-black text-primary">{MOCK_QUESTIONS.length}</p>
+                  <p className="text-3xl font-black text-primary">{questions.length}</p>
                 </div>
               </div>
               
@@ -374,7 +405,7 @@ function QuizContent() {
         <div className="flex-1 max-w-2xl px-12 hidden lg:block">
           <div className="flex items-center justify-between text-xs font-black text-slate-400 mb-3 uppercase tracking-[0.2em]">
             <span>Progress</span>
-            <span className="text-primary font-black">{currentQuestionIdx + 1} / {MOCK_QUESTIONS.length}</span>
+            <span className="text-primary font-black">{currentQuestionIdx + 1} / {questions.length}</span>
           </div>
           <Progress value={progress} className="h-3 bg-slate-100 rounded-full overflow-hidden" indicatorClassName="bg-primary" />
         </div>
@@ -407,26 +438,29 @@ function QuizContent() {
             className="text-center space-y-10"
           >
             <div className="space-y-6">
-              <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-black uppercase tracking-[0.2em]">
-                Question {currentQuestionIdx + 1}
-              </span>
-              <h2 className="text-3xl md:text-5xl font-black text-slate-900 leading-[1.15] tracking-tight max-w-4xl mx-auto">
-                {currentQuestion.question}
-              </h2>
+              <div className="flex items-center justify-center space-x-3">
+                <span className="flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary font-black text-xl flex-shrink-0">
+                  {currentQuestionIdx + 1}
+                </span>
+                <h2 className="text-2xl font-black text-slate-900 leading-tight">
+                  {currentQuestion.question}
+                </h2>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-              {currentQuestion.options.map((option, idx) => {
-                const isSelected = selectedAnswers[currentQuestion.id] === option
-                const isCorrect = isReviewing && option === currentQuestion.correctAnswer
-                const isWrong = isReviewing && isSelected && option !== currentQuestion.correctAnswer
+              {currentQuestion.options.map((option: any, idx: number) => {
+                const isSelected = selectedAnswers[currentQuestion.id] === option.text
+                const correctOptionText = currentQuestion.options.find((o: any) => o.isCorrect)?.text
+                const isCorrect = isReviewing && option.text === correctOptionText
+                const isWrong = isReviewing && isSelected && option.text !== correctOptionText
 
                 return (
                   <motion.button
                     key={idx}
                     whileHover={!isReviewing ? { scale: 1.02, y: -4 } : {}}
                     whileTap={!isReviewing ? { scale: 0.98 } : {}}
-                    onClick={() => handleAnswerSelect(option)}
+                    onClick={() => handleAnswerSelect(option.text)}
                     disabled={isReviewing}
                     className={cn(
                       "relative p-8 rounded-[2.5rem] text-left transition-all group border-4 text-xl font-black min-h-[120px] shadow-xl",
@@ -447,7 +481,7 @@ function QuizContent() {
                       )}>
                         {String.fromCharCode(65 + idx)}
                       </div>
-                      <span className="flex-1">{option}</span>
+                      <span className="flex-1">{option.text}</span>
                     </div>
                     {isCorrect && (
                       <div className="absolute top-4 right-4 bg-emerald-500 rounded-full p-1 shadow-lg">
@@ -504,7 +538,7 @@ function QuizContent() {
         </Button>
 
         <div className="hidden md:flex items-center space-x-3">
-          {MOCK_QUESTIONS.map((_, idx) => (
+          {questions.map((_, idx) => (
             <div
               key={idx}
               className={cn(
@@ -516,7 +550,7 @@ function QuizContent() {
         </div>
 
         <div className="flex items-center space-x-4">
-          {currentQuestionIdx === MOCK_QUESTIONS.length - 1 && !isReviewing ? (
+          {currentQuestionIdx === questions.length - 1 && !isReviewing ? (
             <Button
               onClick={handleFinish}
               disabled={isSubmitting}
@@ -528,13 +562,13 @@ function QuizContent() {
           ) : (
             <Button
               onClick={nextQuestion}
-              disabled={isReviewing && currentQuestionIdx === MOCK_QUESTIONS.length - 1}
+              disabled={isReviewing && currentQuestionIdx === questions.length - 1}
               className={cn(
                 "h-14 px-10 rounded-2xl text-white font-black text-lg shadow-xl transition-all active:scale-95 group",
-                currentQuestionIdx === MOCK_QUESTIONS.length - 1 ? "bg-primary" : "bg-primary hover:bg-primary/90 shadow-primary/20"
+                currentQuestionIdx === questions.length - 1 ? "bg-primary" : "bg-primary hover:bg-primary/90 shadow-primary/20"
               )}
             >
-              {currentQuestionIdx === MOCK_QUESTIONS.length - 1 ? "Finish Review" : "Next Question"}
+              {currentQuestionIdx === questions.length - 1 ? "Finish Review" : "Next Question"}
               <ChevronRight className="ml-3 h-6 w-6 transition-transform group-hover:translate-x-1" />
             </Button>
           )}

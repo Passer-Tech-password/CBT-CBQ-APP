@@ -57,6 +57,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
+import { db } from "@/lib/firebase"
+import { collection, getDocs, query, orderBy, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore"
 
 const questionSchema = z.object({
   question: z.string().min(10, "Question must be at least 10 characters"),
@@ -64,6 +66,7 @@ const questionSchema = z.object({
   subject: z.string().min(1, "Please select a subject"),
   difficulty: z.enum(["Easy", "Medium", "Hard"]),
   explanation: z.string().min(10, "Explanation must be at least 10 characters"),
+  timeLimit: z.number().min(10, "Time limit must be at least 10 seconds"),
   options: z.array(z.object({
     text: z.string().min(1, "Option text cannot be empty"),
     isCorrect: z.boolean()
@@ -72,23 +75,52 @@ const questionSchema = z.object({
 
 type QuestionFormValues = z.infer<typeof questionSchema>
 
-const MOCK_QUESTIONS = [
-  { id: "1", question: "What is the result of 15 x 8?", subject: "Mathematics", type: "MCQ", difficulty: "Easy", status: "Published" },
-  { id: "2", question: "DNA is the primary genetic storage molecule.", subject: "Biology", type: "True/False", difficulty: "Medium", status: "Published" },
-  { id: "3", question: "Solve for x: 2x + 10 = 30", subject: "Mathematics", type: "MCQ", difficulty: "Medium", status: "Draft" },
-  { id: "4", question: "Which organs are part of the circulatory system?", subject: "Biology", type: "Multiple Select", difficulty: "Hard", status: "Published" },
-]
-
 export default function QuestionsManagementPage() {
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [questions, setQuestions] = React.useState<any[]>([])
+  const [subjects, setSubjects] = React.useState<any[]>([])
+  const [editingId, setEditingId] = React.useState<string | null>(null)
   const { toast } = useToast()
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800)
-    return () => clearTimeout(timer)
+  const fetchQuestions = React.useCallback(async () => {
+    try {
+      const q = query(collection(db, "questions"), orderBy("subject"))
+      const querySnapshot = await getDocs(q)
+      const questionsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setQuestions(questionsData)
+    } catch (error) {
+      console.error("Error fetching questions:", error)
+    }
   }, [])
+
+  const fetchSubjects = React.useCallback(async () => {
+    try {
+      const q = query(collection(db, "subjects"), orderBy("name"))
+      const querySnapshot = await getDocs(q)
+      const subjectsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name
+      }))
+      setSubjects(subjectsData)
+    } catch (error) {
+      console.error("Error fetching subjects:", error)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true)
+      await fetchSubjects()
+      await fetchQuestions()
+      setIsLoading(false)
+    }
+    fetchData()
+  }, [fetchSubjects, fetchQuestions])
 
   const form = useForm<QuestionFormValues>({
     resolver: zodResolver(questionSchema),
@@ -98,6 +130,7 @@ export default function QuestionsManagementPage() {
       subject: "",
       difficulty: "Medium",
       explanation: "",
+      timeLimit: 60,
       options: [
         { text: "", isCorrect: false },
         { text: "", isCorrect: false },
@@ -112,16 +145,68 @@ export default function QuestionsManagementPage() {
 
   const onSubmit = async (data: QuestionFormValues) => {
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    console.log(data)
-    setIsSubmitting(false)
-    setIsModalOpen(false)
-    toast({
-      title: "Question Saved",
-      description: "The question has been successfully added to the database.",
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, "questions", editingId), data)
+        toast({
+          title: "Question Updated",
+          description: "The question has been successfully updated.",
+        })
+      } else {
+        await addDoc(collection(db, "questions"), data)
+        toast({
+          title: "Question Saved",
+          description: "The question has been successfully added to the database.",
+        })
+      }
+      setIsModalOpen(false)
+      setEditingId(null)
+      form.reset()
+      fetchQuestions()
+    } catch (error) {
+      console.error("Error saving question:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save question. Please try again.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEdit = (question: any) => {
+    setEditingId(question.id)
+    form.reset({
+      question: question.question,
+      type: question.type,
+      subject: question.subject,
+      difficulty: question.difficulty,
+      explanation: question.explanation,
+      timeLimit: question.timeLimit || 60,
+      options: question.options
     })
-    form.reset()
+    setIsModalOpen(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this question?")) {
+      try {
+        await deleteDoc(doc(db, "questions", id))
+        toast({
+          title: "Question Deleted",
+          description: "The question has been removed.",
+        })
+        fetchQuestions()
+      } catch (error) {
+        console.error("Error deleting question:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete question.",
+        })
+      }
+    }
   }
 
   if (isLoading) {
@@ -171,8 +256,12 @@ export default function QuestionsManagementPage() {
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-10 border-none shadow-2xl">
               <DialogHeader className="mb-8">
-                <DialogTitle className="text-3xl font-black text-slate-900">Create New Question</DialogTitle>
-                <DialogDescription className="text-lg font-bold text-slate-400">Add a new question to the system database.</DialogDescription>
+                <DialogTitle className="text-3xl font-black text-slate-900">
+                  {editingId ? "Edit Question" : "Create New Question"}
+                </DialogTitle>
+                <DialogDescription className="text-lg font-bold text-slate-400">
+                  {editingId ? "Update existing question details." : "Add a new question to the system database."}
+                </DialogDescription>
               </DialogHeader>
 
               <Form {...form}>
@@ -191,11 +280,9 @@ export default function QuestionsManagementPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="rounded-xl border-none shadow-xl">
-                              <SelectItem value="Mathematics">Mathematics</SelectItem>
-                              <SelectItem value="Biology">Biology</SelectItem>
-                              <SelectItem value="Physics">Physics</SelectItem>
-                              <SelectItem value="Chemistry">Chemistry</SelectItem>
-                              <SelectItem value="English">English</SelectItem>
+                              {subjects.map((sub) => (
+                                <SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -220,6 +307,49 @@ export default function QuestionsManagementPage() {
                               <SelectItem value="Hard">Hard</SelectItem>
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-black text-slate-400 uppercase tracking-widest">Question Type</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-12 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold">
+                                <SelectValue placeholder="Select Type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="rounded-xl border-none shadow-xl">
+                              <SelectItem value="MCQ">Multiple Choice (MCQ)</SelectItem>
+                              <SelectItem value="True/False">True / False</SelectItem>
+                              <SelectItem value="Multiple Select">Multiple Select</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="timeLimit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-black text-slate-400 uppercase tracking-widest">Time Limit (Seconds)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              className="h-12 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold" 
+                              {...field} 
+                              onChange={e => field.onChange(parseInt(e.target.value))}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -387,8 +517,9 @@ export default function QuestionsManagementPage() {
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-2xl">
                   <SelectItem value="all">All Subjects</SelectItem>
-                  <SelectItem value="Math">Mathematics</SelectItem>
-                  <SelectItem value="Bio">Biology</SelectItem>
+                  {subjects.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -397,68 +528,79 @@ export default function QuestionsManagementPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent border-none">
-                  <TableHead className="w-[400px] py-6 pl-10 font-black text-slate-400 uppercase tracking-widest text-[10px]">Question Content</TableHead>
-                  <TableHead className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Subject</TableHead>
-                  <TableHead className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Type</TableHead>
-                  <TableHead className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Difficulty</TableHead>
-                  <TableHead className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Status</TableHead>
-                  <TableHead className="text-right pr-10 font-black text-slate-400 uppercase tracking-widest text-[10px]">Actions</TableHead>
+                <TableRow className="hover:bg-transparent border-slate-100">
+                  <TableHead className="font-black text-slate-400 uppercase tracking-wider py-6 px-8 w-20">No.</TableHead>
+                  <TableHead className="font-black text-slate-400 uppercase tracking-wider py-6">Question</TableHead>
+                  <TableHead className="font-black text-slate-400 uppercase tracking-wider py-6">Subject</TableHead>
+                  <TableHead className="font-black text-slate-400 uppercase tracking-wider py-6">Type</TableHead>
+                  <TableHead className="font-black text-slate-400 uppercase tracking-wider py-6">Time</TableHead>
+                  <TableHead className="font-black text-slate-400 uppercase tracking-wider py-6">Difficulty</TableHead>
+                  <TableHead className="text-right font-black text-slate-400 uppercase tracking-wider py-6 px-8">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {MOCK_QUESTIONS.map((q) => (
-                  <TableRow key={q.id} className="group hover:bg-slate-50/50 border-slate-50 transition-colors">
-                    <TableCell className="py-6 pl-10">
-                      <p className="font-bold text-slate-900 line-clamp-2 leading-relaxed">{q.question}</p>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-blue-50 text-primary text-[10px] font-black uppercase tracking-widest">
-                        {q.subject}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm font-bold text-slate-600">{q.type}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn(
-                        "text-xs font-black uppercase tracking-widest",
-                        q.difficulty === 'Easy' ? "text-accent" : 
-                        q.difficulty === 'Medium' ? "text-amber-500" : "text-red-500"
-                      )}>
-                        {q.difficulty}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className={cn(
-                          "h-2 w-2 rounded-full",
-                          q.status === 'Published' ? "bg-accent shadow-[0_0_8px_#10B981]" : "bg-slate-300"
-                        )} />
-                        <span className="text-sm font-bold text-slate-500">{q.status}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right pr-10">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/5">
-                          <Pencil className="h-5 w-5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50">
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
-                      </div>
+                {questions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-slate-400 font-bold">
+                      No questions found. Add your first question to get started.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  questions.map((q, index) => (
+                    <TableRow key={q.id} className="group hover:bg-slate-50/50 border-slate-100 transition-colors">
+                      <TableCell className="py-6 px-8 font-black text-slate-400">{index + 1}</TableCell>
+                      <TableCell className="py-6 font-bold text-slate-900 max-w-md">
+                        <div className="truncate">{q.question}</div>
+                      </TableCell>
+                      <TableCell className="py-6">
+                        <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-black uppercase">
+                          {q.subject}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-6 font-bold text-slate-600">{q.type}</TableCell>
+                      <TableCell className="py-6 font-bold text-slate-500">{q.timeLimit}s</TableCell>
+                      <TableCell className="py-6">
+                        <span className={cn(
+                          "px-3 py-1 rounded-full text-xs font-black uppercase",
+                          q.difficulty === "Easy" ? "bg-emerald-100 text-emerald-600" :
+                          q.difficulty === "Medium" ? "bg-amber-100 text-amber-600" :
+                          "bg-rose-100 text-rose-600"
+                        )}>
+                          {q.difficulty}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-6 px-8 text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleEdit(q)}
+                            className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary transition-all"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDelete(q.id)}
+                            className="h-10 w-10 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
           
           <div className="p-8 bg-slate-50/30 border-t border-slate-50 flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-400">Showing 4 of 124 questions</p>
+            <p className="text-sm font-bold text-slate-400">Showing {questions.length} questions</p>
             <div className="flex items-center space-x-2">
               <Button variant="outline" disabled className="h-10 px-4 rounded-xl border-2 font-black text-xs uppercase tracking-widest">Prev</Button>
-              <Button variant="outline" className="h-10 px-4 rounded-xl border-2 font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white hover:border-primary transition-all">Next</Button>
+              <Button variant="outline" disabled className="h-10 px-4 rounded-xl border-2 font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white hover:border-primary transition-all">Next</Button>
             </div>
           </div>
         </Card>

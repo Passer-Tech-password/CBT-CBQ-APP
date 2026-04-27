@@ -30,6 +30,7 @@ import { useAuth } from "@/components/auth-provider"
 
 const NAV_ITEMS = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin" },
+  { name: "Subjects", icon: BookOpen, path: "/admin/subjects" },
   { name: "Questions", icon: BookOpen, path: "/admin/questions" },
   { name: "Users", icon: Users, path: "/admin/users" },
   { name: "Quiz Builder", icon: BookOpen, path: "/admin/builder" },
@@ -41,9 +42,21 @@ const NAV_ITEMS = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { userData } = useAuth()
+  const { userData, loading } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !userData) {
+      router.push("/login")
+    } else if (!loading && userData && userData.role === "student") {
+      router.push("/dashboard")
+    }
+  }, [userData, loading, router])
+
+  if (loading || (userData && userData.role === "student")) {
+    return null
+  }
 
   const handleSignOut = async () => {
     try {

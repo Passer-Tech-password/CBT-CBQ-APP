@@ -11,7 +11,7 @@ interface UserData {
   uid: string
   email: string | null
   fullName: string
-  role: "student" | "admin"
+  role: "student" | "teacher" | "admin"
   isNewUser?: boolean
   isOffline?: boolean
   [key: string]: any
@@ -22,6 +22,7 @@ interface AuthContextType {
   userData: UserData | null
   loading: boolean
   isAdmin: boolean
+  isTeacher: boolean
   isOffline: boolean
 }
 
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthContextType>({
   userData: null,
   loading: true,
   isAdmin: false,
+  isTeacher: false,
   isOffline: false,
 })
 
@@ -66,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
                 fullName: data.fullName || firebaseUser.displayName || "User",
-                role: (data.role as "student" | "admin") || "student",
+                role: (data.role as "student" | "teacher" | "admin") || "student",
                 ...data,
               } as UserData)
               setIsOffline(false)
@@ -100,12 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUserData({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
-                fullName: firebaseUser.displayName || "User (Offline)",
+                fullName: firebaseUser.displayName || "Offline User",
                 role: "student",
-                isOffline: true,
               } as UserData)
+              setLoading(false)
             }
-            setLoading(false)
           }
         )
 
@@ -120,18 +121,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authUnsub()
       if (snapshotUnsub) snapshotUnsub()
     }
-  }, [])
-
-  const value = {
-    user,
-    userData,
-    loading,
-    isAdmin: userData?.role === "admin",
-    isOffline: isOffline || !!userData?.isOffline,
-  }
+  }, [toast])
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        userData,
+        loading,
+        isAdmin: userData?.role === "admin",
+        isTeacher: userData?.role === "teacher" || userData?.role === "admin",
+        isOffline,
+      }}
+    >
       {loading ? <LoadingScreen /> : children}
     </AuthContext.Provider>
   )
